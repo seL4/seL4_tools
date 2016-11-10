@@ -204,6 +204,7 @@ default: $(PRIORITY_TARGETS) install-headers $(TARGETS)
 #
 default: $(patsubst %.bin,$(SEL4_BINDIR)/%,$(filter %.bin,$(TARGETS)))
 default: $(patsubst %.a,$(SEL4_LIBDIR)/%.a,$(filter %.a,$(TARGETS)))
+#default: $(patsubst %.a,$(EXTLIBDIRS)/%.a,$(filter %.a,$(TARGETS)))
 
 $(SEL4_BINDIR)/%: %.bin
 	$(Q)mkdir -p $(dir $@)

@@ -51,7 +51,7 @@ endif
 
 LIBS = cpio
 
-NK_CFLAGS += -ffreestanding -Wall -Werror -W -Wextra
+NK_CFLAGS += -ffreestanding -Wall -W -Wextra
 
 include $(SEL4_COMMON)/common.mk
 
