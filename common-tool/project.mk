@@ -173,6 +173,34 @@ MAKEFLAGS	+= -rR
 
 export HOSTCC HOSTCFLAGS MAKEFLAGS
 
+# Kernel cc-option compiler
+K_CC =
+ifdef CONFIG_KERNEL_COMPILER
+ifneq (${CONFIG_KERNEL_COMPILER},)
+ifneq (${CONFIG_KERNEL_COMPILER},"")
+K_CC = ${CONFIG_KERNEL_COMPILER}
+endif
+endif
+endif
+ifeq (${K_CC},)
+K_CC = ${CONFIG_CROSS_COMPILER_PREFIX:"%"=%}gcc
+endif
+
+# Non-kernel cc-option compiler
+NK_CC =
+ifdef CONFIG_USER_COMPILER
+ifneq (${CONFIG_USER_COMPILER},)
+ifneq (${CONFIG_USER_COMPILER},"")
+NK_CC = ${CONFIG_USER_COMPILER}
+endif
+endif
+endif
+ifeq (${NK_CC},)
+NK_CC = ${CONFIG_CROSS_COMPILER_PREFIX:"%"=%}gcc
+endif
+
+export K_CC NK_CC
+
 AS	= $(CROSS_COMPILE)as
 CC	= ${CCACHE} $(CROSS_COMPILE)gcc
 LD	= $(CROSS_COMPILE)ld -nostdlib

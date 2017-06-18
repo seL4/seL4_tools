@@ -26,22 +26,27 @@ NK_ASFLAGS =
 
 NK_CCFLAGS =
 
-ldflags-y += $(call cc-ldoption, -Wl$(comma)--build-id=none)
+LDFLAGS += $(call cc-ldoption, $(K_CC), -Wl$(comma)--build-id=none)
+NK_LDFLAGS += $(call cc-ldoption, $(NK_CC), -Wl$(comma)--build-id=none)
 
 ifeq ($(CONFIG_ARCH_X86),y)
-	ccflags-y += $(call cc-option,-fno-stack-protector)
+	CCFLAGS += $(call cc-option, $(K_CC), -fno-stack-protector)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -fno-stack-protector)
 	export ARCH = x86
 	DEFINES += ARCH_X86
 	export ARCH_X86
 	export RUST_ENDIAN = little
 	export RUST_ENV = gnu
-	ccflags-y += $(call cc-option,-fno-pic)
+	CCFLAGS += $(call cc-option, $(K_CC), -fno-pic)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -fno-pic)
 	ldflags-y += -static
 endif
 
 ifeq ($(CONFIG_ARCH_ARM),y)
-	ccflags-y += $(call cc-option,-marm)
-	ccflags-y += $(call cc-option,-Wtrampolines)
+	CCFLAGS += $(call cc-option, $(K_CC), -marm)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -marm)
+	CCFLAGS += $(call cc-option, $(K_CC), -Wtrampolines)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -Wtrampolines)
 	export ARCH = arm
 	DEFINES += ARCH_ARM
 	export ARCH_ARM
@@ -50,7 +55,8 @@ ifeq ($(CONFIG_ARCH_ARM),y)
 endif
 
 ifeq ($(CONFIG_ARCH_IA32),y)
-	ccflags-y += $(call cc-option,-m32)
+	CCFLAGS += $(call cc-option, $(K_CC), -m32)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -m32)
 
 	ldflags-y += -Wl,-m,elf_i386
 	asflags-y += -Wa,--32
@@ -71,8 +77,10 @@ ifeq ($(CONFIG_ARCH_IA32),y)
 endif
 
 ifeq ($(CONFIG_ARCH_X86_64),y)
-	cflags-y += $(call cc-option,-m64)
-	cflags-y += $(call cc-option, -fno-asynchronous-unwind-tables,)
+	CFLAGS += $(call cc-option, $(K_CC), -m64)
+	NK_CFLAGS += $(call cc-option, $(NK_CC), -m64)
+	CFLAGS += $(call cc-option, $(K_CC), -fno-asynchronous-unwind-tables,)
+	NK_CFLAGS += $(call cc-option, $(NK_CC), -fno-asynchronous-unwind-tables,)
 	ldflags-y  += -Wl,-m -Wl,elf_x86_64
 	asflags-y  += -Wa,--64
 	NK_LDFLAGS += -Wl,-m -Wl,elf_x86_64
@@ -147,8 +155,10 @@ ifeq ($(CONFIG_ARCH_AARCH64),y)
 endif
 
 ifeq ($(CONFIG_ARM1136JF_S),y)
-	ccflags-y += $(call cc-option,-mcpu=arm1136jf-s,-march=armv6)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=arm1136jf-s, -Wa$(comma)-march=armv6)
+	CCFLAGS += $(call cc-option, $(K_CC), -mcpu=arm1136jf-s, -march=armv6)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mcpu=arm1136jf-s, -march=armv6)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=arm1136jf-s, -Wa$(comma)-march=armv6)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=arm1136jf-s, -Wa$(comma)-march=armv6)
 	DEFINES += ARMV6
 	DEFINES += ARM1136J_S
 	export RUST_CPU = arm1136jf-s
@@ -159,8 +169,10 @@ endif
 
 
 ifeq ($(CONFIG_ARM_CORTEX_A7),y)
-	ccflags-y += $(call cc-option, -mcpu=cortex-a7,-march=armv7-a)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a7, -Wa$(comma)-march=armv7-a)
+	CCFLAGS += $(call cc-option, $(K_CC), -mcpu=cortex-a7, -march=armv7-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mcpu=cortex-a7, -march=armv7-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a7, -Wa$(comma)-march=armv7-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a7, -Wa$(comma)-march=armv7-a)
 	DEFINES += ARMV7_A
 	DEFINES += ARM_CORTEX_A7
 	export ARMV=armv7-a
@@ -168,8 +180,10 @@ ifeq ($(CONFIG_ARM_CORTEX_A7),y)
 endif
 
 ifeq ($(CONFIG_ARM_CORTEX_A8),y)
-	ccflags-y += $(call cc-option, -mcpu=cortex-a8,-march=armv7-a)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a8, -Wa$(comma)-march=armv7-a)
+	CCFLAGS += $(call cc-option, $(K_CC), -mcpu=cortex-a8,-march=armv7-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mcpu=cortex-a8,-march=armv7-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a8, -Wa$(comma)-march=armv7-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a8, -Wa$(comma)-march=armv7-a)
 	DEFINES += ARMV7_A
 	DEFINES += ARM_CORTEX_A8
 	export ARMV=armv7-a
@@ -179,8 +193,10 @@ ifeq ($(CONFIG_ARM_CORTEX_A8),y)
 endif
 
 ifeq ($(CONFIG_ARM_CORTEX_A9),y)
-	ccflags-y += $(call cc-option, -mcpu=cortex-a9, -march=armv7-a)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a9, -Wa$(comma)-march=armv7-a)
+	CCFLAGS += $(call cc-option, $(K_CC), -mcpu=cortex-a9, -march=armv7-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mcpu=cortex-a9, -march=armv7-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a9, -Wa$(comma)-march=armv7-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a9, -Wa$(comma)-march=armv7-a)
 	DEFINES += ARMV7_A
 	DEFINES += ARM_CORTEX_A9
 	export ARMV=armv7-a
@@ -190,11 +206,16 @@ ifeq ($(CONFIG_ARM_CORTEX_A9),y)
 endif
 
 ifeq ($(CONFIG_ARM_CORTEX_A15),y)
-	ccflags-y += $(call cc-option, -mtune=cortex-a15,)
-	asflags-y += $(call as-option, -Wa$(comma)-mtune=cortex-a15,)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a15,)
-	ccflags-y += $(call cc-option,-march=armv7ve,-march=armv7-a)
-	asflags-y += $(call as-option,-Wa$(comma)-march=armv7ve,-Wa$(comma)-march=armv7-a)
+	CCFLAGS += $(call cc-option, $(K_CC), -mtune=cortex-a15,)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mtune=cortex-a15,)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mtune=cortex-a15,)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mtune=cortex-a15,)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a15,)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a15,)
+	CCFLAGS += $(call cc-option, $(K_CC), -march=armv7ve, -march=armv7-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -march=armv7ve, -march=armv7-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-march=armv7ve, -Wa$(comma)-march=armv7-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-march=armv7ve, -Wa$(comma)-march=armv7-a)
 	DEFINES += ARMV7_A
 	DEFINES += ARM_CORTEX_A15
 	export ARMV=armv7-a
@@ -204,11 +225,16 @@ ifeq ($(CONFIG_ARM_CORTEX_A15),y)
 endif
 
 ifeq ($(CONFIG_ARM_CORTEX_A53),y)
-	ccflags-y += $(call cc-option, -mtune=cortex-a53)
-	ccflags-y += $(call cc-option, -march=armv8-a)
-	asflags-y += $(call as-option, -Wa$(comma)-march=armv8-a)
-	asflags-y += $(call as-option, -Wa$(comma)-mtune=cortex-a53)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a53)
+	CCFLAGS += $(call cc-option, $(K_CC), -mtune=cortex-a53)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mtune=cortex-a53)
+	CCFLAGS += $(call cc-option, $(K_CC), -march=armv8-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -march=armv8-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-march=armv8-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-march=armv8-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mtune=cortex-a53)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mtune=cortex-a53)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a53)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a53)
 	DEFINES += ARMV8_A
 	DEFINES += ARM_CORTEX_A53
 	export ARMV=armv8-a
@@ -218,11 +244,16 @@ ifeq ($(CONFIG_ARM_CORTEX_A53),y)
 endif
 
 ifeq ($(CONFIG_ARM_CORTEX_A57),y)
-	ccflags-y += $(call cc-option, -mtune=cortex-a57)
-	ccflags-y += $(call cc-option, -march=armv8-a)
-	asflags-y += $(call as-option, -Wa$(comma)-march=armv8-a)
-	asflags-y += $(call as-option, -Wa$(comma)-mtune=cortex-a57)
-	asflags-y += $(call as-option, -Wa$(comma)-mcpu=cortex-a57)
+	CCFLAGS += $(call cc-option, $(K_CC), -mtune=cortex-a57)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -mtune=cortex-a57)
+	CCFLAGS += $(call cc-option, $(K_CC), -march=armv8-a)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -march=armv8-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-march=armv8-a)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-march=armv8-a)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mtune=cortex-a57)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mtune=cortex-a57)
+	ASFLAGS += $(call as-option, $(K_CC), -Wa$(comma)-mcpu=cortex-a57)
+	NK_ASFLAGS += $(call as-option, $(NK_CC), -Wa$(comma)-mcpu=cortex-a57)
 	DEFINES += ARMV8_A
 	DEFINES += ARM_CORTEX_A57
 	export ARMV=armv8-a
@@ -352,7 +383,7 @@ endif
 # Kernel debugging.
 ifeq ($(CONFIG_DEBUG_BUILD),y)
 	# Set CFLAGS because we only want this to go to the kernel build system, not user
-	CFLAGS += $(call cc-option,-g)
+	CFLAGS += $(call cc-option,$(K_CC),-g)
 	DEFINES += DEBUG
 	DEFINES += SEL4_DEBUG_KERNEL
 	export DEBUG=1
@@ -360,18 +391,18 @@ endif
 
 # Userspace debugging.
 ifeq (${CONFIG_USER_DEBUG_INFO},y)
-	NK_CCFLAGS += $(call cc-option,-g3,-g) $(call cc-option,-ggdb3,-ggdb) $(call cc-option,-save-temps,)
+	NK_CCFLAGS += $(call cc-option,$(NK_CC),-g3,-g) $(call cc-option,$(NK_CC),-ggdb3,-ggdb) $(call cc-option,$(NK_CC),-save-temps,)
 endif
 
 ifeq (${CONFIG_USER_DEBUG_BUILD},y)
-	NK_CCFLAGS += $(call cc-option, -g)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -g)
 else
 	DEFINES += NDEBUG
 endif
 
 ifeq (${CONFIG_USER_LINKER_GC_SECTIONS},y)
-	NK_CCFLAGS += $(call cc-option, -ffunction-sections)
-	NK_CCFLAGS += $(call cc-option, -fdata-sections)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -ffunction-sections)
+	NK_CCFLAGS += $(call cc-option, $(NK_CC), -fdata-sections)
 	NK_LDFLAGS += -Wl,--gc-sections
 endif
 
