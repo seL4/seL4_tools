@@ -101,32 +101,32 @@ try-run = $(shell set -e;		\
 	rm -f "$$TMP" "$$TMPO")
 
 # as-option
-# Usage: cflags-y += $(call as-option,-Wa$(comma)-isa=foo,)
+# Usage: cflags-y += $(call as-option, <compiler>, -Wa$(comma)-isa=foo,)
 
 as-option = $(call try-run,\
-	$(CC) $(KBUILD_CFLAGS) $(1) -c -xassembler /dev/null -o "$$TMP",$(1),$(2))
+	$(1) $(KBUILD_CFLAGS) $(2) -c -xassembler /dev/null -o "$$TMP",$(2),$(3))
 
 # as-instr
-# Usage: cflags-y += $(call as-instr,instr,option1,option2)
+# Usage: cflags-y += $(call as-instr, <compiler>, instr, option1, option2)
 
 as-instr = $(call try-run,\
-	/bin/echo -e "$(1)" | $(CC) $(KBUILD_AFLAGS) -c -xassembler -o "$$TMP" -,$(2),$(3))
+	/bin/echo -e "$(2)" | $(1) $(KBUILD_AFLAGS) -c -xassembler -o "$$TMP" -,$(3),$(4))
 
 # cc-option
-# Usage: cflags-y += $(call cc-option,-march=winchip-c6,-march=i586)
+# Usage: cflags-y += $(call cc-option, <compiler>, -march=winchip-c6, -march=i586)
 
 cc-option = $(call try-run,\
-	$(CC) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(1) -c -xc /dev/null -o "$$TMP",$(1),$(2))
+	$(1) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(2) -c -xc /dev/null -o "$$TMP",$(2),$(3))
 
 # cc-option-yn
-# Usage: flag := $(call cc-option-yn,-march=winchip-c6)
+# Usage: flag := $(call cc-option-yn, <compiler>, -march=winchip-c6)
 cc-option-yn = $(call try-run,\
-	$(CC) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(1) -c -xc /dev/null -o "$$TMP",y,n)
+	$(1) $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(2) -c -xc /dev/null -o "$$TMP",y,n)
 
 # cc-option-align
 # Prefix align with either -falign or -malign
 cc-option-align = $(subst -functions=0,,\
-	$(call cc-option,-falign-functions=0,-malign-functions=0))
+	$(call cc-option,$(1),-falign-functions=0,-malign-functions=0))
 
 # cc-version
 # Usage gcc-ver := $(call cc-version)
@@ -142,14 +142,14 @@ cc-fullversion = $(shell $(CONFIG_SHELL) \
 cc-ifversion = $(shell [ $(call cc-version, $(CC)) $(1) $(2) ] && echo $(3))
 
 # cc-ldoption
-# Usage: ldflags += $(call cc-ldoption, -Wl$(comma)--hash-style=both)
+# Usage: ldflags += $(call cc-ldoption, <compiler>, -Wl$(comma)--hash-style=both)
 cc-ldoption = $(call try-run,\
-	$(CC) $(1) -nostdlib -xc /dev/null -o "$$TMP",$(1),$(2))
+	$(1) $(2) -nostdlib -xc /dev/null -o "$$TMP",$(2),$(3))
 
 # ld-option
-# Usage: LDFLAGS += $(call ld-option, -X)
+# Usage: LDFLAGS += $(call ld-option, <compiler>, -X)
 ld-option = $(call try-run,\
-	$(CC) /dev/null -c -o "$$TMPO" ; $(LD) $(1) "$$TMPO" -o "$$TMP",$(1),$(2))
+	$(1) /dev/null -c -o "$$TMPO" ; $(LD) $(2) "$$TMPO" -o "$$TMP",$(2),$(3))
 
 ######
 
