@@ -129,12 +129,38 @@ fail() {
 # Generate an archive of the userspace and kernel images.
 mkdir -p "${TEMP_DIR}/cpio"
 cp -f ${KERNEL_IMAGE} ${TEMP_DIR}/cpio/kernel.elf
-cp -f ${USER_IMAGE} ${TEMP_DIR}/cpio
-${TOOLPREFIX}strip --strip-all ${TEMP_DIR}/cpio/*
+cp -f ${USER_IMAGE} ${TEMP_DIR}/cpio/
+if [ "${STRIP}" = "y" ]; then
+    ${TOOLPREFIX}strip --strip-all ${TEMP_DIR}/cpio/*
+fi
+
+if [ "${HASH}" = "y" ]; then
+    if [ "${HASH_SHA}" = "y" ]; then
+        # (2 Invocations so the hash gets printed on the terminal)
+        # SHA256 hash of entire Kernel ELF and store it to .bin file. Add the .bin file to CPIO archive
+        sha256sum ${TEMP_DIR}/cpio/kernel.elf
+        sha256sum ${TEMP_DIR}/cpio/kernel.elf | cut -d ' ' -f 1 | xxd -r -p > ${TEMP_DIR}/cpio/kernel.bin
+
+        # SHA256 hash of entire Application ELF and store it to .bin file. Add the .bin file to CPIO archive
+        sha256sum ${TEMP_DIR}/cpio/$(basename ${USER_IMAGE})
+        sha256sum ${TEMP_DIR}/cpio/$(basename ${USER_IMAGE}) | cut -d ' ' -f 1 | xxd -r -p > ${TEMP_DIR}/cpio/app.bin
+    else
+        # MD5 hash of entire Kernel ELF and store it to .bin file. Add the .bin file to CPIO archive
+        md5sum ${TEMP_DIR}/cpio/kernel.elf
+        md5sum ${TEMP_DIR}/cpio/kernel.elf | cut -d ' ' -f 1 | xxd -r -p > ${TEMP_DIR}/cpio/kernel.bin
+
+        # MD5 hash of entire Application ELF and store it to .bin file. Add the .bin file to CPIO archive
+        md5sum ${TEMP_DIR}/cpio/$(basename ${USER_IMAGE})
+        md5sum ${TEMP_DIR}/cpio/$(basename ${USER_IMAGE}) | cut -d ' ' -f 1 | xxd -r -p > ${TEMP_DIR}/cpio/app.bin
+    fi
+fi
 
 pushd "${TEMP_DIR}/cpio" &>/dev/null
-printf "kernel.elf\n$(basename ${USER_IMAGE})\n" | cpio --quiet -o -H newc > ${TEMP_DIR}/archive.cpio
-
+if [ "${HASH}" = "y" ]; then
+    printf "kernel.elf\n$(basename ${USER_IMAGE})\nkernel.bin\napp.bin" | cpio --quiet -o -H newc > ${TEMP_DIR}/archive.cpio
+else
+    printf "kernel.elf\n$(basename ${USER_IMAGE})" | cpio --quiet -o -H newc > ${TEMP_DIR}/archive.cpio
+fi
 # Strip CPIO metadata if possible.
 which cpio-strip >/dev/null 2>/dev/null
 if [ $? -eq 0 ]; then
@@ -170,7 +196,9 @@ ${TOOLPREFIX}ld -T "${SCRIPT_DIR}/linker.lds_pp" \
         "${SCRIPT_DIR}/elfloader.o" "${TEMP_DIR}/archive.o" \
         -Ttext=${ENTRY_ADDR} -o "${OUTPUT_FILE}" \
         || fail
-${TOOLPREFIX}strip --strip-all ${OUTPUT_FILE}
+if [ "${STRIP}" = "y" ]; then
+    ${TOOLPREFIX}strip --strip-all ${OUTPUT_FILE}
+fi
 
 #
 # Remove ELF stuff to have an PE32+/COFF executable file.

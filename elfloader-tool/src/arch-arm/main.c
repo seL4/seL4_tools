@@ -10,6 +10,8 @@
  * @TAG(DATA61_GPL)
  */
 
+#include <autoconf.h>
+
 #include <printf.h>
 #include <types.h>
 #include <abort.h>
@@ -18,6 +20,16 @@
 #include <cpio/cpio.h>
 
 #include <elfloader.h>
+
+#ifdef CONFIG_HASH_INSTRUCTIONS
+  #ifdef CONFIG_HASH_SHA
+    #include "crypt_sha256.h"
+  #else
+    #include "crypt_md5.h"
+  #endif
+#endif
+
+#include "hash.h"
 
 /* Determine if two intervals overlap. */
 static int regions_overlap(uintptr_t startA, uintptr_t endA,
@@ -55,7 +67,7 @@ static void unpack_elf_to_paddr(void *elf, paddr_t dest_paddr)
     uint16_t i;
     uint64_t min_vaddr, max_vaddr;
     size_t image_size;
-    
+
     word_t phys_virt_offset;
 
     /* Get size of the image. */
@@ -92,8 +104,8 @@ static void unpack_elf_to_paddr(void *elf, paddr_t dest_paddr)
  *
  * Return the byte past the last byte of the physical address used.
  */
-static paddr_t load_elf(const char *name, void *elf,
-                        paddr_t dest_paddr, struct image_info *info, int keep_headers)
+static paddr_t load_elf(const char *name, void *elf, paddr_t dest_paddr,
+                        struct image_info *info, int keep_headers, unsigned long size, const char *hash)
 {
     uint64_t min_vaddr, max_vaddr;
     size_t image_size;
@@ -115,6 +127,51 @@ static paddr_t load_elf(const char *name, void *elf,
         printf("Input ELF file not 4-byte aligned in memory!\n");
         abort();
     }
+
+#ifdef CONFIG_HASH_INSTRUCTIONS
+
+    /* Get the binary file that contains the SHA256 Hash */
+    unsigned long unused;
+    void *file_hash = cpio_get_file(_archive_start, (const char *)hash, &unused);
+    uint8_t *print_hash_pointer = (uint8_t *)file_hash;
+
+    /* If the file hash doesn't have a pointer, the file doesn't exist, so we cannot confirm the file is what we expect. Abort */
+    if(file_hash == NULL) {
+        printf("Cannot compare hashes for %s, expected hash, %s, doesn't exist\n", name, hash);
+        abort();
+    }
+    else {
+
+        hashes_t hashes;
+
+#ifdef CONFIG_HASH_SHA
+        int hash_len = 32;
+        hashes.hash_type = SHA_256;
+#else
+        int hash_len = 16;
+        hashes.hash_type = MD5;
+#endif
+
+        uint8_t calculated_hash[hash_len];
+
+        /* Print the Hash for the user to see */
+        printf("Hash from ELF File: ");
+        print_hash(print_hash_pointer, hash_len);
+
+        get_hash(hashes, elf, size, calculated_hash);
+
+        /* Print the hash so the user can see they're the same or different */
+        printf("Hash for ELF Input: ");
+        print_hash(calculated_hash, hash_len);
+
+        /* Check to make sure the hashes are the same */
+        if(strncmp((char *)file_hash, (char *)calculated_hash, hash_len) != 0) {
+            printf("Hashes are different. Load failure\n");
+            abort();
+        }
+    }
+
+#endif  /* CONFIG_HASH_INSTRUCTIONS */
 
     /* Print diagnostics. */
     printf("ELF-loading image '%s'\n", name);
@@ -226,7 +283,7 @@ void load_images(struct image_info *kernel_info, struct image_info *user_info,
 
     elf_getMemoryBounds(kernel_elf, 1, &kernel_phys_start, &kernel_phys_end);
     next_phys_addr = load_elf("kernel", kernel_elf,
-                              (paddr_t)kernel_phys_start, kernel_info, 0);
+                              (paddr_t)kernel_phys_start, kernel_info, 0, unused, "kernel.bin");
 
     /*
      * Load userspace images.
@@ -250,8 +307,7 @@ void load_images(struct image_info *kernel_info, struct image_info *user_info,
 
         /* Load the file into memory. */
         next_phys_addr = load_elf(elf_filename, user_elf,
-                                  next_phys_addr, &user_info[*num_images], 1);
+                                  next_phys_addr, &user_info[*num_images], 1, unused, "app.bin");
         *num_images = i + 1;
     }
 }
-
