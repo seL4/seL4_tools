@@ -10,14 +10,14 @@
     "linker-is-gnu": true,
     "executables": true,
     "no-compiler-rt": false,
-    "relocation-model": "pic",
+    "relocation-model": "static",
     "position-independent-executables": false,
     "dynamic_linking": false,
-    "has-elf-tls": true,
+    "has-elf-tls": false,
     "panic-strategy": "abort",
     "no-default-libraries": true,
     "linker-flavor": "gcc",
     "pre-link-args": {
-        "gcc": ["-m32", "-ffreestanding", "-nodefaultlibs", "-nostdlib"]
+        "gcc": ["-m32", "-ffreestanding", "-nodefaultlibs", "-nostdlib", "-fno-stack-protector"]
     }
 }
