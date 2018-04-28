@@ -19,6 +19,6 @@
     "no-default-libraries": true,
     "linker-flavor": "gcc",
     "pre-link-args": {
-        "gcc": ["-ffreestanding", "-nodefaultlibs", "-nostdlib", -"-fno-stack-protector"]
+        "gcc": ["-ffreestanding", "-nodefaultlibs", "-nostdlib", "-fno-stack-protector"]
     }
 }
