@@ -84,6 +84,31 @@ map_kernel_window(struct image_info *kernel_info)
 #endif
 
 int num_apps = 0;
+
+#ifdef CONFIG_SEL4_RV_MACHINE
+void main(int hardid, unsigned long dtb)
+{
+    (void) hardid;
+    printf("ELF-loader started on\n");
+
+    printf("  paddr=[%p..%p]\n", _start, _end - 1);
+    /* Unpack ELF images into memory. */
+    load_images(&kernel_info, &user_info, 1, &num_apps);
+    if (num_apps != 1) {
+        printf("No user images loaded!\n");
+        abort();
+    }
+
+    printf("Jumping to kernel-image entry point...\n\n");
+
+    ((init_riscv_kernel_t)kernel_info.phys_region_start)(user_info.phys_region_start,
+                                            user_info.phys_region_end, user_info.phys_virt_offset,
+                                            user_info.virt_entry, 0, dtb);
+
+  /* We should never get here. */
+    printf("Kernel returned back to the elf-loader.\n");
+}
+#else
 void main(int hardid, unsigned long dtb)
 {
     (void) hardid;
@@ -117,3 +142,4 @@ void main(int hardid, unsigned long dtb)
   /* We should never get here. */
     printf("Kernel returned back to the elf-loader.\n");
 }
+#endif
