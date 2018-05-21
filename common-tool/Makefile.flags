@@ -238,6 +238,12 @@ ifeq ($(CONFIG_ARCH_RISCV),y)
    export ARCH = riscv
    export PLAT = spike
 
+ifeq ($(CONFIG_SEL4_RV_MACHINE),y)
+   export PK_FLAGS = --enable-boot-machine
+else
+   export PK_FLAGS = --disable-boot-machine
+endif
+
 ifeq ($(CONFIG_ARCH_RISCV_RV64),y)
    ccflags-y += $(call cc-option, -march=rv64imac)
    ccflags-y += $(call cc-option, -mabi=lp64)

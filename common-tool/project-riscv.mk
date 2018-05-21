@@ -48,7 +48,7 @@ elfloader: libcpio common FORCE
 	$(Q)(cd $(BUILD_BASE)/bbl && \
 	${TOOLS_ROOT}/riscv-pk/configure --quiet \
 		--host=$(CONFIG_CROSS_COMPILER_PREFIX:"%-"=%) \
-		--with-payload=$(IMAGE_ROOT)/$@-$(ARCH)-$(PLAT) && \
+	$(PK_FLAGS) --with-payload=$(IMAGE_ROOT)/$@-$(ARCH)-$(PLAT) && \
 	$(MAKE) $(MAKE_SILENT) clean && $(MAKE) $(MAKE_SILENT) > /dev/null)
 	$(Q)cp $(BUILD_BASE)/bbl/bbl $(IMAGE_ROOT)/$@-$(ARCH)-$(PLAT)
 
