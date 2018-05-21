@@ -132,6 +132,16 @@ function(DeclareRootserver rootservername)
         # On RISC-V we need to package up our final elf image into the Berkeley boot loader
         # which is what the following custom command is achieving
 
+        # TODO: Currently we do not support native RISC-V builds, because there
+        # is no natve environment to test this. Thus CROSS_COMPILER_PREFIX is
+        # always set and the BBL build below uses it to create the the
+        # "--host=..." parameter. For now, make the build fail if
+        # CROSS_COMPILER_PREFIX if not set. It seems that native builds can
+        # simply omit the host paramteter.
+        if("${CROSS_COMPILER_PREFIX}" STREQUAL "")
+            message(FATAL_ERROR "CROSS_COMPILER_PREFIX not set.")
+        endif()
+
         # Get host string which is our cross compiler minus the trailing '-'
         string(REGEX REPLACE "^(.*)-$" "\\1" host ${CROSS_COMPILER_PREFIX})
         add_custom_command(OUTPUT "${IMAGE_NAME}"
@@ -242,12 +252,13 @@ function(GenerateSimulateScript)
     elseif(KernelPlatformSpike)
         if (KernelSel4ArchRiscV32)
             set(binary "qemu-system-riscv32")
+            SetDefaultMemSize("2000M")
         elseif(KernelSel4ArchRiscV64)
             set(binary "qemu-system-riscv64")
+            SetDefaultMemSize("4095M")
         endif()
-        set(QemuBinaryMachine "${binary} -machine spike_v1.10 -m size=4095M")
+        set(QemuBinaryMachine "${binary} -machine spike_v1.10")
         list(APPEND QemuFlags "-s -serial mon:stdio")
-        SetDefaultMemSize("4095M")
     else()
         set(error "Unsupported platform or architecture for simulation")
     endif()
