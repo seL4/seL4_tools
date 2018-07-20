@@ -81,7 +81,7 @@ map_kernel_window(struct image_info *kernel_info)
 
     for (int page = 0; l1_index < PTES_PER_PT; l1_index++, page++)
     {
-        l1pt[l1_index] = PTE_CREATE_LEAF((seL4_Word)(kernel_info->phys_region_start + page));
+        l1pt[l1_index] = PTE_CREATE_LEAF((seL4_Word)(kernel_info->phys_region_start + (page << PTE_LEVEL_BITS)));
     }
 }
 
