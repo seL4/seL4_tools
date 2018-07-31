@@ -55,19 +55,19 @@ function(RustAddLibrary lib_name)
         message(FATAL_ERROR "${RUST_TARGET} cannot contain .json")
     endif()
 
-    find_program(CARGO_TOOL cargo)
-    if ("${CARGO_TOOL}" STREQUAL "CARGO_TOOL-NOTFOUND")
-        message(FATAL_ERROR "Could not find tool cargo")
+    find_program(XARGO_TOOL xargo)
+    if ("${XARGO_TOOL}" STREQUAL "XARGO_TOOL-NOTFOUND")
+        message(FATAL_ERROR "Could not find tool xargo. Install with `cargo install xargo` \
+    or see https://github.com/japaric/xargo")
     endif()
-
 
     add_custom_target(${libmain}_custom
         BYPRODUCTS ${RUST_BUILD_DIR}/${RUST_LIB_FILENAME}
         USES_TERMINAL
         DEPENDS ${RUST_DEPENDS}
         WORKING_DIRECTORY ${RUST_SOURCE_DIR}
-        COMMAND ${CMAKE_COMMAND} -E env RUST_TARGET_PATH=${target_path} RUSTFLAGS="--sysroot=${CMAKE_HOME_DIRECTORY}/sysroot"
-        ${CARGO_TOOL} build --manifest-path ${RUST_SOURCE_DIR}/Cargo.toml --target ${RUST_TARGET} --target-dir ${RUST_BUILD_DIR} -Z unstable-options --out-dir ${RUST_BUILD_DIR}
+        COMMAND ${CMAKE_COMMAND} -E env RUST_TARGET_PATH=${target_path}
+        ${XARGO_TOOL} build --target ${RUST_TARGET} --target-dir ${RUST_BUILD_DIR} -Z unstable-options --out-dir ${RUST_BUILD_DIR}
     )
 
     add_library(${lib_name} STATIC IMPORTED GLOBAL)
