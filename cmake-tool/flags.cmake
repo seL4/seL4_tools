@@ -49,7 +49,9 @@ set(LinkPageSize "0x1000" CACHE STRING "Page size to be used for linker")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -nostdlib -z max-page-size=${LinkPageSize}")
 
 if(KernelArchX86)
-    add_compile_options(-mtls-direct-seg-refs)
+    if(NOT ClangGccToolchain)
+        add_compile_options(-mtls-direct-seg-refs)
+    endif()
 endif()
 
 # find the compilers crtbegin and crtend files
