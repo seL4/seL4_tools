@@ -38,4 +38,4 @@ then
 fi
 
 # Initialize cmake
-cmake -DCMAKE_TOOLCHAIN_FILE=${SCRIPT_PATH}/kernel/gcc.cmake -G Ninja $@ ${SCRIPT_PATH} && cmake ${SCRIPT_PATH} && cmake ${SCRIPT_PATH}
+cmake -DPLATFORM=rpi3 -DAARCH32=TRUE -DSIMULATION=1 -DCMAKE_TOOLCHAIN_FILE=${SCRIPT_PATH}/kernel/gcc.cmake -G Ninja $@ ${SCRIPT_PATH} && cmake ${SCRIPT_PATH} && cmake ${SCRIPT_PATH}
