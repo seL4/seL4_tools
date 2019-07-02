@@ -271,6 +271,8 @@ else()
         OR KernelPlatformRocketChip
     )
         set(PlatformEntryAddr 0x80400000)
+    elseif(KernelPlatformImx8qm)
+        set(PlatformEntryAddr 0x900000000)
     else()
         if(KernelArchARM OR KernelArchRiscV)
             message(FATAL_ERROR "Unknown platform when generating image")
