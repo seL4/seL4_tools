@@ -29,6 +29,7 @@ import re
 import sys
 
 import libarchive
+import libarchive.public
 
 import elf_sift
 import platform_sift
@@ -78,7 +79,7 @@ def warn(message: str):
     write('warning: {}'.format(message))
 
 
-def get_bytes(entry: libarchive.entry.ArchiveEntry) -> io.BytesIO:
+def get_bytes(entry: libarchive.adapters.archive_read._ArchiveEntryItReadable) -> io.BytesIO:
     """
     Return an io.BytesIO object with the contents of the given archive entry.
     """
@@ -149,9 +150,9 @@ sufficiently-large memory region.
     is_dtb_present = False
     is_good_fit = False
 
-    with libarchive.memory_reader(get_cpio(image)) as archive:
+    with libarchive.public.memory_reader(get_cpio(image)) as archive
         for entry in archive:
-            name = entry.name
+            name = entry.pathname
             debug('encountered CPIO entry name: {}'.format(name))
 
             if name == 'kernel.elf':
