@@ -161,14 +161,17 @@ static inline void enable_virtual_memory(void)
 }
 
 int num_apps = 0;
-void main(UNUSED int hartid, void *dtb)
+void main(UNUSED int hardid, void *bootloader_dtb)
 {
-    uint32_t dtb_size;
+    void *dtb = NULL;
+    uint32_t dtb_size = 0;
     printf("ELF-loader started on (HART %d) (NODES %d)\n", hartid, CONFIG_MAX_NUM_NODES);
 
     printf("  paddr=[%p..%p]\n", _start, _end - 1);
-    /* Unpack ELF images into memory. */
-    load_images(&kernel_info, &user_info, 1, &num_apps, &dtb, &dtb_size);
+    /* Unpack ELF images into memory.
+     * Note that we do not pass the bootloader's DTB as
+     * we want to use the kernel's version of the DTB. */
+    load_images(&kernel_info, &user_info, 1, &num_apps, bootloader_dtb, &dtb, &dtb_size);
     if (num_apps != 1) {
         printf("No user images loaded!\n");
         abort();
@@ -196,7 +199,7 @@ void main(UNUSED int hartid, void *dtb)
                                                   hartid,
                                                   0
 #endif
-                                                  );
+                                                 );
 
     /* We should never get here. */
     printf("Kernel returned back to the elf-loader.\n");
@@ -219,7 +222,7 @@ void secondary_entry(int hart_id, int core_id)
                                                   ,
                                                   hart_id,
                                                   core_id
-                                                  );
+                                                 );
 }
 
 #endif
