@@ -1,5 +1,5 @@
 /*
- * Copyright 2017, Data61
+ * Copyright 2019, Data61
  * Commonwealth Scientific and Industrial Research Organisation (CSIRO)
  * ABN 41 687 119 230.
  *
@@ -12,12 +12,22 @@
 
 #pragma once
 
+#include <autoconf.h>
+#include <elfloader/gen_config.h>
+
 /*
  * UART Hardware Constants
  *
  */
 
-#define IMX8_UART1_PADDR   0x30860000
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+    #define IMX8_UART1_PADDR   0x30890000
+#elif defined(CONFIG_PLAT_IMX8MQ_EVK)
+    #define IMX8_UART1_PADDR   0x30860000
+#else
+    #error "unusupported IMX8 platform"
+#endif
+
 
 #define UART_PPTR          IMX8_UART1_PADDR
 
