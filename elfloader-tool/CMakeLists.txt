@@ -314,6 +314,7 @@ target_include_directories(
     PRIVATE
         "include"
         "include/plat/${KernelPlatform}"
+        "include/plat/${KernelArmPlatform}"
         "include/arch-${KernelArch}"
         "include/arch-${KernelArch}/${KernelWordSize}"
         "${CMAKE_CURRENT_BINARY_DIR}/gen_headers"

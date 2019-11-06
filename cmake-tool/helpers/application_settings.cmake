@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.8.2)
 include_guard(GLOBAL)
 
 function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
-    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;rockpro64;zynqmp;imx8mm-evk;hifive")
+    set(binary_list "tx1;hikey;odroidc2;imx8m;rockpro64;zynqmp;hifive")
     set(efi_list "tk1")
     set(uimage_list "tx2;am335x")
     if(
@@ -34,7 +34,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(ElfloaderMode "hypervisor" CACHE STRING "" FORCE)
         set(ElfloaderMonitorHook ON CACHE BOOL "" FORCE)
     endif()
-    if((KernelPlatformImx8mm-evk OR KernelPlatformImx8mq-evk) AND KernelSel4ArchAarch32)
+    if(KernelPlatImx8m AND KernelSel4ArchAarch32)
         set(ElfloaderArmV8LeaveAarch64 ON CACHE BOOL "" FORCE)
         # This applies to imx8mm and imx8mq when in aarch32 configuration
         # It should be possible to use a uimage format but when tried nothing
@@ -110,6 +110,8 @@ function(correct_platform_strings)
         am335x-boneblue
         x86_64
         ia32
+        imx8mm-evk
+        imx8mq-evk
     )
     set(
         correct_platform_strings_platform_aliases ${correct_platform_strings_platform_aliases}
@@ -146,6 +148,12 @@ function(correct_platform_strings)
     elseif("${PLATFORM}" STREQUAL "ia32")
         set(KernelPlatform pc99 CACHE STRING "" FORCE)
         set(KernelSel4Arch ia32 CACHE STRING "" FORCE)
+    elseif("${PLATFORM}" STREQUAL "imx8mq-evk")
+        set(KernelPlatform imx8m CACHE STRING "" FORCE)
+        set(KernelARMPlatform imx8mq-evk CACHE STRING "" FORCE)
+    elseif("${PLATFORM}" STREQUAL "imx8mm-evk")
+        set(KernelPlatform imx8m CACHE STRING "" FORCE)
+        set(KernelARMPlatform imx8mm-evk CACHE STRING "" FORCE)
     elseif(NOT "${PLATFORM}" STREQUAL "")
         set(KernelPlatform ${PLATFORM} CACHE STRING "" FORCE)
         set(_REWRITE OFF)
