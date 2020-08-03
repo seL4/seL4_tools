@@ -10,6 +10,13 @@
 
 #ifdef __ASSEMBLER__
 
+#define CPTR_EL2_RES1     ((3 << 12) | (3 << 8) | 0xFF)
+
+#define CUR_EL1           0x00000004
+#define CUR_EL2           0x00000008
+#define CUR_EL3           0x0000000c
+
+#define PSR_M_BIT         0x00000010
 #define PSR_F_BIT         0x00000040
 #define PSR_I_BIT         0x00000080
 #define PSR_A_BIT         0x00000100
@@ -21,6 +28,12 @@
 #define PSR_MODE_EL2t     0x00000008
 #define PSR_MODE_EL2h     0x00000009
 #define PSR_MODE_SVC_32   0x00000013
+#define PSR_MODE_HYP_32   0x0000001a
+
+#define SCR_HCE_BIT       (1 << 8)
+#define SCR_SMD_BIT       (1 << 7)
+#define SCR_EL3_RES1      (3 << 4)
+#define SCR_NS_BIT        (1 << 0)
 
 #define TCR_T0SZ(x)       ((64 - (x)))
 #define TCR_T1SZ(x)       ((64 - (x)) << 16)

@@ -123,6 +123,7 @@ if(ElfloaderArmV8LeaveAarch64)
         OUTPUT crt0_64.bin crt0_64.o
         COMMAND
             ${AARCH64_COMPILER} -I${CMAKE_CURRENT_SOURCE_DIR}/include/
+            -I${CMAKE_BINARY_DIR}/kernel/gen_config/
             -I${CMAKE_CURRENT_SOURCE_DIR}/include/arch-arm/64/
             -I${CMAKE_CURRENT_SOURCE_DIR}/include/arch-arm/armv/armv8-a/64/ -c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/arch-arm/32/crt0_64.S -o
