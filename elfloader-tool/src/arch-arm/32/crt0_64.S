@@ -11,6 +11,8 @@
 #include <kernel/gen_config.h>
 #include <assembler.h>
 #include <armv/assembler.h>
+#include <hardware.h>
+#include <gic_v2.h>
 
 .section ".text.start"
 
@@ -24,6 +26,37 @@ BEGIN_FUNC(_start)
     b.eq 2f
 
 3:
+    /* Re-route IRQs to non-secure world */
+    mov x8, #GICD_BASE
+    add x9, x8, #GICD_CTLR
+    mov w10, #0x0
+    str w10, [x9]
+
+    /* Get ITLinesNumber */
+    add x9, x8, #GICD_TYPER
+    ldr w11, [x9]
+    and w11, w11, 0x1f
+    add w11, w11, #1
+
+    /* Re-route to Group1 */
+    add x9, x8, #GICD_IGROUPR(0)
+    mov w10, #-1
+loop:
+    str w10, [x9], #4
+    subs w11, w11, #1
+    b.ne loop
+
+    /* Disable GICC */
+    mov x8, #GICC_BASE
+    add x9, x8, #GICC_CTLR
+    mov w10, #0x0
+    str w10, [x9]
+
+    /* Set the priority mask */
+    add x9, x8, #GICC_PMR
+    mov w10, #0xff
+    str w10, [x9]
+
     /* Disable all traps to EL3 and EL2 */
     msr cptr_el3, xzr
     mov x9, #CPTR_EL2_RES1
