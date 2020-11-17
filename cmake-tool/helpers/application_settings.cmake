@@ -108,6 +108,7 @@ function(correct_platform_strings)
         exynos5422
         am335x-boneblack
         am335x-boneblue
+        am335x-bone
         x86_64
         ia32
     )
@@ -140,6 +141,9 @@ function(correct_platform_strings)
     elseif("${PLATFORM}" STREQUAL "am335x-boneblue")
         set(KernelPlatform am335x CACHE STRING "" FORCE)
         set(KernelARMPlatform am335x-boneblue CACHE STRING "" FORCE)
+    elseif("${PLATFORM}" STREQUAL "am335x-bone")
+        set(KernelPlatform am335x CACHE STRING "" FORCE)
+        set(KernelARMPlatform am335x-bone CACHE STRING "" FORCE)
     elseif("${PLATFORM}" STREQUAL "x86_64")
         set(KernelPlatform pc99 CACHE STRING "" FORCE)
         set(KernelSel4Arch x86_64 CACHE STRING "" FORCE)
