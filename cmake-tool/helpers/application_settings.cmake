@@ -45,7 +45,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(IMAGE_START_ADDR 0x8000000 CACHE INTERNAL "" FORCE)
     endif()
     if(${kernel_platform} STREQUAL "rk3288")
-	set(IMAGE_START_ADDR 0x02008000 CACHE INTERNAL "" FORCE)
+        set(IMAGE_START_ADDR 0x00800000 CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
 
@@ -106,7 +106,6 @@ function(correct_platform_strings)
         wandq
         kzm
         rpi3
-        rk3288-ntablet
         exynos5250
         exynos5410
         exynos5422
@@ -144,9 +143,6 @@ function(correct_platform_strings)
     elseif("${PLATFORM}" STREQUAL "am335x-boneblue")
         set(KernelPlatform am335x CACHE STRING "" FORCE)
         set(KernelARMPlatform am335x-boneblue CACHE STRING "" FORCE)
-    elseif("${PLATFORM}" STREQUAL "rk3288-ntablet")
-	set(KernelPlatform rk3288 CACHE STRING "" FORCE)
-	set(KernelARMPlatform rk3288-ntablet CACHE STRING "" FORCE)
     elseif("${PLATFORM}" STREQUAL "x86_64")
         set(KernelPlatform pc99 CACHE STRING "" FORCE)
         set(KernelSel4Arch x86_64 CACHE STRING "" FORCE)
