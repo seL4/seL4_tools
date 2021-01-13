@@ -23,6 +23,9 @@ extern void arm_enable_hyp_mmu(void);
 void init_boot_vspace(struct image_info *kernel_info);
 void init_hyp_boot_vspace(struct image_info *kernel_info);
 
+void init_static_smmu(void);
+void test_static_smmu(struct image_info *kernel_info);
+
 /* Assembly functions. */
 extern void flush_dcache(void);
 extern void cpu_idle(void);

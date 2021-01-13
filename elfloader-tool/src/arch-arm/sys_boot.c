@@ -198,6 +198,9 @@ void continue_boot(int was_relocated)
     smp_boot();
 #endif /* CONFIG_MAX_NUM_NODES */
 
+    printf("Initialising a static smmu configuration.\n");
+    init_static_smmu();
+
     if (is_hyp_mode()) {
         printf("Enabling hypervisor MMU and paging\n");
         arm_enable_hyp_mmu();

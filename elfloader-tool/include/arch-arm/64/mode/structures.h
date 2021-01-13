@@ -21,9 +21,14 @@
 #define PMD_BITS                9
 #define PMD_SIZE_BITS           (PMD_BITS + PMDE_SIZE_BITS)
 
+#define PTEE_SIZE_BITS          3
+#define PTE_BITS                9
+#define PTE_SIZE_BITS           (PTE_BITS + PTEE_SIZE_BITS)
+
 #define GET_PGD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS + PUD_BITS)) & MASK(PGD_BITS))
 #define GET_PUD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS)) & MASK(PUD_BITS))
 #define GET_PMD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS)) & MASK(PMD_BITS))
+#define GET_PTE_INDEX(x)        (((x) >> 12) & MASK(PTE_BITS))
 
 extern uint64_t _boot_pgd_up[BIT(PGD_BITS)];
 extern uint64_t _boot_pud_up[BIT(PUD_BITS)];
@@ -32,3 +37,8 @@ extern uint64_t _boot_pmd_up[BIT(PMD_BITS)];
 extern uint64_t _boot_pgd_down[BIT(PGD_BITS)];
 extern uint64_t _boot_pud_down[BIT(PUD_BITS)];
 
+extern uint64_t _smmu_pgd[BIT(PGD_BITS)];
+extern uint64_t _smmu_pud[BIT(PUD_BITS)];
+extern uint64_t _smmu_pmd[BIT(PGD_BITS)];
+extern uint64_t _smmu_pte_lo[BIT(PTE_BITS)];
+extern uint64_t _smmu_pte_hi[BIT(PTE_BITS)];
