@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 3.8.2)
 include_guard(GLOBAL)
 
 function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
-    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;rockpro64;zynqmp;imx8mm-evk;hifive")
+    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;rockpro64;zynqmp;imx8mm-evk;hifive;rk3288")
     set(efi_list "tk1")
     set(uimage_list "tx2;am335x")
     if(
@@ -45,7 +45,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(IMAGE_START_ADDR 0x8000000 CACHE INTERNAL "" FORCE)
     endif()
     if(${kernel_platform} STREQUAL "rk3288")
-        set(IMAGE_START_ADDR 0x00800000 CACHE INTERNAL "" FORCE)
+        set(IMAGE_START_ADDR 0x008000000 CACHE INTERNAL "" FORCE)
     endif()
 endfunction()
 
