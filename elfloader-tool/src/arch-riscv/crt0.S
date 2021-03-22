@@ -23,10 +23,28 @@ _start:
 .option pop
 
 /* OpenSBI starts all HARTs and sends them to this entry point. */
-  li s0, CONFIG_FIRST_HART_ID
-  bne  a0, s0, secondary_harts
+//  li s0, CONFIG_FIRST_HART_ID
+//  bne  a0, s0, secondary_harts
 
   la sp, (elfloader_stack_alloc + BIT(12))
+
+  la s0, main
+  jr s0
+
+.global _start_1
+_start_1:
+
+.option push
+.option norelax
+1:auipc gp, %pcrel_hi(__global_pointer$)
+  addi  gp, gp, %pcrel_lo(1b)
+.option pop
+
+/* OpenSBI starts all HARTs and sends them to this entry point. */
+//  li s0, CONFIG_FIRST_HART_ID
+//  bne  a0, s0, secondary_harts
+
+  la sp, (elfloader_stack_alloc + BIT(12) - 1024)
 
   la s0, main
   jr s0
@@ -41,6 +59,7 @@ bootstack_secondary_cores:
 
 .text
 
+.global secondary_harts
 secondary_harts:
 #if CONFIG_MAX_NUM_NODES > 1
   la a1, next_logical_core_id

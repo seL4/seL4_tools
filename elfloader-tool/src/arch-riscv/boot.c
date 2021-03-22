@@ -12,6 +12,7 @@
 #include <elfloader.h>
 #include <abort.h>
 #include <cpio/cpio.h>
+#include <sbi.h>
 
 #define PT_LEVEL_1 1
 #define PT_LEVEL_2 2
@@ -157,11 +158,21 @@ static inline void enable_virtual_memory(void)
     ifence();
 }
 
+extern void _start_1(unsigned long);
+extern void secondary_harts(void);
 int num_apps = 0;
 void main(UNUSED int hartid, void *bootloader_dtb)
 {
     printf("ELF-loader started on (HART %d) (NODES %d)\n", hartid, CONFIG_MAX_NUM_NODES);
 
+    if (hartid != CONFIG_FIRST_HART_ID)
+    {
+        printf("Startng HART 1\n");
+        sbi_hart_start(CONFIG_FIRST_HART_ID, _start_1, 1);
+        printf("Stopping current HART\n");
+        secondary_harts();
+        /* NO RETURN */
+    }
     printf("  paddr=[%p..%p]\n", _text, _end - 1);
     /* Unpack ELF images into memory. */
     load_images(&kernel_info, &user_info, 1, &num_apps, bootloader_dtb, &dtb, &dtb_size);
