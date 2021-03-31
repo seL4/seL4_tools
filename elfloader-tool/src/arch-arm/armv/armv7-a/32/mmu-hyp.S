@@ -81,5 +81,7 @@ BEGIN_FUNC(arm_enable_hyp_mmu)
     mcr     p15, 0, r0, c1, c0, 1
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
+	isb sy
+
     ldmfd   sp!, {pc}
 END_FUNC(arm_enable_hyp_mmu)
