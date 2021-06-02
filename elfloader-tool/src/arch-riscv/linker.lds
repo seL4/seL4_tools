@@ -3,104 +3,82 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
-OUTPUT_ARCH( "riscv" )
+
+/*
+ * NOTE: For RISC-V 32-bit, having the .rodata section before the .data section causes the elfloader to
+ *       freeze up. Thus, for 32-bit we move the .rodata section to after the .bss section as previously
+ *       before some refactoring. The 64-bit version does not seem to be affect by this issue and uses thus
+ *       uses the new layout.
+ */
+
+#include <autoconf.h>
+#include <elfloader/gen_config.h>
+#include "image_start_addr.h"
 
 ENTRY( _start )
 
 SECTIONS
 {
-
-  /*--------------------------------------------------------------------*/
-  /* Code and read-only segment                                         */
-  /*--------------------------------------------------------------------*/
-
-  /* Begining of code and text segment */
-  . = 0x0000000080400000;
-  _text = .;
-  /* . = 0x00000000ff000000; *
-  _ftext = .;
-  PROVIDE( eprol = . );
-
-
-  /* text: Program code section */
-  .start :
+    . = IMAGE_START_ADDR;
+    _text = .;
+    .start :
     {
         *(.text.start)
     }
-
-  .text :
-  {
-    *(.text)
-  }
-
-  /* End of code and read-only segment */
-  PROVIDE( etext = . );
-  _etext = .;
-
-  /*--------------------------------------------------------------------*/
-  /* Initialized data segment                                           */
-  /*--------------------------------------------------------------------*/
-
-  /* Start of initialized data segment */
-  . = ALIGN(16);
-   _fdata = .;
-
-  /* Start of data section */
-
-    _sdata = .;
-   .sdata : {
-    __global_pointer$ = . + 0x800;
-    *(.sdata*)
-  }
-    .srodata : {
-    *(.srodata*)
-  }
-
-  /* data: Writable data */
-  .data :
-  {
-    *(.data)
-    *(.data.*)
-  }
-
-  /* End of initialized data segment */
-  . = ALIGN(4);
-  PROVIDE( edata = . );
-  _edata = .;
-
-  /*--------------------------------------------------------------------*/
-  /* Uninitialized data segment                                         */
-  /*--------------------------------------------------------------------*/
-
-  /* Start of uninitialized data segment */
-  . = .;
-  _fbss = .;
-
-  /* sbss: Uninitialized writeable small data section */
-  . = .;
-
-  /* bss: Uninitialized writeable data section */
-  . = .;
-  _bss = .;
-  .bss :
-  {
-    *(.bss)
-    *(.bss.*)
-    *(.sbss*)
-  }
-  _bss_end = .;
-
-  /* rodata: Read-only data */
-  .rodata :
-  {
-    *(.rodata)
-    *(.rodata.*)
-
-    . = ALIGN(8);
-    _archive_start = .;
-      *(._archive_cpio)
-    _archive_end = .;
-  }
-
-_end = .;
+    .text :
+    {
+        *(.text)
+    }
+#ifdef CONFIG_ARCH_RISCV64
+    . = ALIGN(16);
+    .rodata :
+    {
+        *(.srodata*)
+        . = ALIGN(16);
+        *(.rodata)
+        *(.rodata.*)
+        /*
+         * ld crashes when we add this here: *(_driver_list)
+         */
+        . = ALIGN(16);
+        _archive_start = .;
+        *(._archive_cpio)
+        _archive_end = .;
+    }
+#endif
+    . = ALIGN(16);
+    .data :
+    {
+        __global_pointer$ = . + 0x800;
+        *(.sdata*)
+        *(.data)
+        *(.data.*)
+    }
+    . = ALIGN(16);
+    .bss :
+    {
+        _bss = .;
+        *(.sbss*)
+        *(.bss)
+        *(.bss.*)
+        _bss_end = .;
+    }
+#ifdef CONFIG_ARCH_RISCV32
+    . = ALIGN(16);
+    .rodata :
+    {
+        *(.srodata*)
+        . = ALIGN(16);
+        *(.rodata)
+        *(.rodata.*)
+        /*
+         * ld crashes when we add this here: *(_driver_list)
+         */
+        . = ALIGN(16);
+        _archive_start = .;
+        *(._archive_cpio)
+        _archive_end = .;
+    }
+#endif
+     _end = .;
 }
