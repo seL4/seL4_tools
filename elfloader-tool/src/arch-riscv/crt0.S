@@ -30,8 +30,13 @@ _start:
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
 
-/* a0 should have hart id, store it in temp so as not to clobber from HSM calls */
-  mv t3, a0
+/* a0 should have hart id, store it in s0 so as not to clobber from HSM calls */
+  mv s0, a0
+
+#ifdef CONFIG_IMAGE_BINARY
+/* Clear the BSS before we get to do anything more specific */
+  jal clear_bss
+#endif
 
 /* Check Heart State Management extension exists so we can use that to switch harts
    if we are not hart 1, otherwise rely on the legacy extension. */
@@ -40,7 +45,7 @@ _start:
    or an extension-specific non-zero value if it is available.*/
 
   jal spi_probe_extension
-  mv a0, t3
+  mv a0, s0
   li s1, 1
   blt x1, s1, _start1
 
@@ -49,9 +54,9 @@ _start:
   li t2, 1
   amoadd.w t1, t2, (t1)
 
-  mv a0, t3
-  li s0, CONFIG_FIRST_HART_ID
-  beq  a0, s0, _start1
+  mv a0, s0
+  li s1, CONFIG_FIRST_HART_ID
+  beq  a0, s1, _start1
 
 /* start hart 1*/
 hsm_switch_hart:
@@ -62,6 +67,7 @@ hsm_switch_hart:
   li a2, 0       // passed in a1 when new hart starts, this is the logical hart_id
   ecall
 
+  mv a0, s0 // Copy the ID of the HART again, since we've clobbered a0
   j secondary_harts
 
 _start1:
