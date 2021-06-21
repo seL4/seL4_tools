@@ -29,6 +29,8 @@
 #include <platform_info.h> // this provides memory_region
 #endif
 
+#define KEEP_HEADERS_SIZE BIT(PAGE_BITS)
+
 extern char _bss[];
 extern char _bss_end[];
 
@@ -45,7 +47,46 @@ void clear_bss(void)
     }
 }
 
-#define KEEP_HEADERS_SIZE BIT(PAGE_BITS)
+/*
+ * print CPIO file info
+ */
+static void print_info_cpio_file(
+    char const *indent_str,
+    char const *name,
+    void const *blob,
+    size_t size)
+{
+    printf("%sCPIO %s file [%p..%p], %zu byte\n",
+           indent_str,
+           name,
+           blob,
+           (void *)((uintptr_t)blob + size - 1),
+           size);
+}
+
+/*
+ * print data block copy operation
+ */
+static void print_copy_operation(
+    char const *indent_str,
+    char const *op_str,
+    void const *src,
+    void const *dst,
+    size_t size)
+{
+    if (0 == size) {
+        printf("%s%s [%p -> %p, size 0]\n", indent_str, op_str, src, dst);
+    } else {
+        printf("%s%s [%p..%p] -> [%p..%p], %d byte\n",
+               indent_str,
+               op_str,
+               src,
+               (void *)((uintptr_t)src + size - 1),
+               dst,
+               (void *)((uintptr_t)dst + size - 1),
+               size);
+    }
+}
 
 /*
  * Determine if two intervals overlap.
@@ -91,135 +132,21 @@ static int ensure_phys_range_valid(
 }
 
 /*
- * Unpack an ELF file to the given physical address.
+ * check hash of ELF
  */
-static int unpack_elf_to_paddr(
-    void const *elf,
-    paddr_t dest_paddr)
-{
-    int ret;
-
-    /* Get the memory bounds. Unlike most other functions, this returns 1 on
-     * success and anything else is an error.
-     */
-    uint64_t u64_min_vaddr, u64_max_vaddr;
-    ret = elf_getMemoryBounds(elf, 0, &u64_min_vaddr, &u64_max_vaddr);
-    if (ret != 1) {
-        printf("ERROR: Could not get image size\n");
-        return -1;
-    }
-
-    /* Check that image virtual address range is sane */
-    if ((u64_min_vaddr > UINTPTR_MAX) || (u64_max_vaddr > UINTPTR_MAX)) {
-        printf("ERROR: image virtual address [%"PRIu64"..%"PRIu64"] exceeds "
-               "UINTPTR_MAX (%u)\n",
-               u64_min_vaddr, u64_max_vaddr, UINTPTR_MAX);
-        return -1;
-    }
-
-    vaddr_t max_vaddr = (vaddr_t)u64_max_vaddr;
-    vaddr_t min_vaddr = (vaddr_t)u64_min_vaddr;
-    size_t image_size = max_vaddr - min_vaddr;
-
-    if (dest_paddr + image_size < dest_paddr) {
-        printf("ERROR: image destination address integer overflow\n");
-        return -1;
-    }
-
-    /* Zero out all memory in the region, as the ELF file may be sparse. */
-    memset((void *)dest_paddr, 0, image_size);
-
-    /* Load each segment in the ELF file. */
-    for (unsigned int i = 0; i < elf_getNumProgramHeaders(elf); i++) {
-        /* Skip segments that are not marked as being loadable. */
-        if (elf_getProgramHeaderType(elf, i) != PT_LOAD) {
-            continue;
-        }
-
-        /* Parse size/length headers. */
-        vaddr_t seg_vaddr = elf_getProgramHeaderVaddr(elf, i);
-        size_t seg_size = elf_getProgramHeaderFileSize(elf, i);
-        size_t seg_elf_offset = elf_getProgramHeaderOffset(elf, i);
-
-        size_t seg_virt_offset = seg_vaddr - min_vaddr;
-        paddr_t seg_dest_paddr = dest_paddr + seg_virt_offset;
-        void const *seg_src_addr = (void const *)((uintptr_t)elf +
-                                                  seg_elf_offset);
-
-        /* Check segment sanity and integer overflows. */
-        if ((seg_vaddr < min_vaddr) ||
-            (seg_size > image_size) ||
-            (seg_src_addr < elf) ||
-            ((uintptr_t)seg_src_addr + seg_size < (uintptr_t)elf) ||
-            (seg_virt_offset > image_size) ||
-            (seg_virt_offset + seg_size > image_size) ||
-            (seg_dest_paddr < dest_paddr) ||
-            (seg_dest_paddr + seg_size < dest_paddr)) {
-            printf("ERROR: segement %d invalid\n", i);
-            return -1;
-        }
-
-        /* Load data into memory. */
-        memcpy((void *)seg_dest_paddr, seg_src_addr, seg_size);
-    }
-
-    return 0;
-}
-
-/*
- * Load an ELF file into physical memory at the given physical address.
- *
- * Returns in 'next_phys_addr' the byte past the last byte of the physical
- * address used.
- */
-static int load_elf(
+static int check_hash(
     void const *cpio,
     size_t cpio_len,
-    const char *name,
     void const *elf_blob,
     size_t elf_blob_size,
-    char const *elf_hash_filename,
-    paddr_t dest_paddr,
-    int keep_headers,
-    struct image_info *info,
-    paddr_t *next_phys_addr)
+    char const *elf_hash_filename)
 {
-    int ret;
-    uint64_t min_vaddr, max_vaddr;
-
-    /* Print diagnostics. */
-    printf("ELF-loading image '%s' to %p\n", name, dest_paddr);
-
-    /* Get the memory bounds. Unlike most other functions, this returns 1 on
-     * success and anything else is an error.
-     */
-    ret = elf_getMemoryBounds(elf_blob, 0, &min_vaddr, &max_vaddr);
-    if (ret != 1) {
-        printf("ERROR: Could not get image bounds\n");
-        return -1;
-    }
-
-    /* round up size to the end of the page next page */
-    max_vaddr = ROUND_UP(max_vaddr, PAGE_BITS);
-    size_t image_size = (size_t)(max_vaddr - min_vaddr);
-
-    /* Ensure our starting physical address is aligned. */
-    if (!IS_ALIGNED(dest_paddr, PAGE_BITS)) {
-        printf("ERROR: Attempting to load ELF at unaligned physical address\n");
-        return -1;
-    }
-
-    /* Ensure that the ELF file itself is 4-byte aligned in memory, so that
-     * libelf can perform word accesses on it. */
-    if (!IS_ALIGNED(dest_paddr, 2)) {
-        printf("ERROR: Input ELF file not 4-byte aligned in memory\n");
-        return -1;
-    }
 
 #ifdef CONFIG_HASH_NONE
 
     UNUSED_VARIABLE(cpio);
     UNUSED_VARIABLE(cpio_len);
+    UNUSED_VARIABLE(elf_blob);
     UNUSED_VARIABLE(elf_blob_size);
     UNUSED_VARIABLE(elf_hash_filename);
 
@@ -279,10 +206,84 @@ static int load_elf(
 
 #endif  /* CONFIG_HASH_NONE */
 
-    /* Print diagnostics. */
-    printf("  paddr=[%p..%p]\n", dest_paddr, dest_paddr + image_size - 1);
-    printf("  vaddr=[%p..%p]\n", (vaddr_t)min_vaddr, (vaddr_t)max_vaddr - 1);
-    printf("  virt_entry=%p\n", (vaddr_t)elf_getEntryPoint(elf_blob));
+    return 0;
+
+}
+
+/*
+ * Load an ELF file into physical memory at the given physical address.
+ *
+ * 'paddr' holds the physical start address and returns the byte after the last
+ * byte of the physical area used.
+ */
+static int load_elf(
+    void const *elf_blob,
+    int keep_headers,
+    paddr_t *p_paddr,
+    struct image_info *info)
+{
+    int ret;
+    paddr_t paddr = *p_paddr;
+
+    /* Ensure that the ELF file itself is 4-byte aligned in memory, so libelf
+     * can perform word accesses on it. */
+    if (!IS_ALIGNED((uintptr_t)elf_blob, 2)) {
+        printf("ERROR: ELF in CPIO not 4-byte aligned!\n", paddr);
+        return -1;
+    }
+
+    /* get the memory bounds, but unlike other functions, this returns 1 on
+     * success, anything else is an error.
+     */
+    uint64_t elf_vaddr_start = 0;
+    uint64_t elf_vaddr_end = 0;
+    ret = elf_getMemoryBounds(elf_blob, 0, &elf_vaddr_start, &elf_vaddr_end);
+    if (ret != 1) {
+        printf("ERROR: Could not get image bounds!\n");
+        return -1;
+    }
+
+    /* we can only handle ELF files where the virtual addresses fit in the
+     * memory we can address. Usually this should not be an issue, because a
+     * 32-bit ElfLoader can't be expected to deal with ELF files for 64-bit
+     * platforms. Nevertheless the ELF format uses 64-bit addresses, so we have
+     * to check range violations before we cast the integers down.
+     */
+    if ((elf_vaddr_start > UINTPTR_MAX) || (elf_vaddr_end > UINTPTR_MAX)) {
+        printf("ERROR: ELF file uses virtual addresses beyond UINTPTR_MAX!\n");
+        return -1;
+    }
+    uintptr_t vaddr_start = (uintptr_t)elf_vaddr_start;
+    uintptr_t vaddr_end = (uintptr_t)elf_vaddr_end;
+
+
+    /* round up size to the end of the page next page */
+    vaddr_end = ROUND_UP(vaddr_end, PAGE_BITS);
+    size_t image_size = (size_t)(vaddr_end - vaddr_start);
+    vaddr_t entry = (vaddr_t)elf_getEntryPoint(elf_blob);
+
+    /* print diagnostics first, then do error checks*/
+    printf("  paddr=[%p..%p], %zu byte\n",
+           (void *)paddr,
+           (void *)(paddr + image_size - 1),
+           image_size);
+    printf("  vaddr=[%p..%p]\n", (void *)vaddr_start, (void *)(vaddr_end - 1));
+    printf("  virt_entry=%p\n", (void *)entry);
+
+
+    /* Ensure the physical and virtual start address is page aligned. */
+    if (!IS_ALIGNED(paddr, PAGE_BITS) || !IS_ALIGNED(vaddr_start, PAGE_BITS)) {
+        printf("ERROR: physical or virtual address not 2^%d page aligend!\n",
+               PAGE_BITS);
+        return -1;
+    }
+
+    /* Ensure that region we want to write to is sane. */
+    ret = ensure_phys_range_valid(paddr, paddr + image_size);
+    if (0 != ret) {
+        printf("ERROR: Physical address range invalid\n");
+        return -1;
+    }
 
     /* Ensure the ELF file is valid. */
     ret = elf_checkFile(elf_blob);
@@ -291,36 +292,49 @@ static int load_elf(
         return -1;
     }
 
-    /* Ensure sane alignment of the image. */
-    if (!IS_ALIGNED(min_vaddr, PAGE_BITS)) {
-        printf("ERROR: Start of image is not 4K-aligned\n");
-        return -1;
-    }
-
-    /* Ensure that we region we want to write to is sane. */
-    ret = ensure_phys_range_valid(dest_paddr, dest_paddr + image_size);
-    if (0 != ret) {
-        printf("ERROR: Physical address range invalid\n");
-        return -1;
-    }
-
-    /* Copy the data. */
-    ret = unpack_elf_to_paddr(elf_blob, dest_paddr);
-    if (0 != ret) {
-        printf("ERROR: Unpacking ELF to %p failed\n", dest_paddr);
-        return -1;
-    }
-
     /* Record information about the placement of the image. */
-    info->phys_region_start = dest_paddr;
-    info->phys_region_end = dest_paddr + image_size;
-    info->virt_region_start = (vaddr_t)min_vaddr;
-    info->virt_region_end = (vaddr_t)max_vaddr;
-    info->virt_entry = (vaddr_t)elf_getEntryPoint(elf_blob);
-    info->phys_virt_offset = dest_paddr - (vaddr_t)min_vaddr;
+    info->phys_region_start = paddr;
+    info->phys_region_end = paddr + image_size;
+    info->virt_region_start = (vaddr_t)vaddr_start;
+    info->virt_region_end = (vaddr_t)vaddr_end;
+    info->virt_entry = entry;
+    info->phys_virt_offset = paddr - (paddr_t)vaddr_start;
+
+    /* Zero out all memory in the region, as the ELF file may be sparse. */
+    memset((void *)paddr, 0, image_size);
+
+    /* Load each segment in the ELF file. */
+    for (unsigned int i = 0; i < elf_getNumProgramHeaders(elf_blob); i++) {
+
+        size_t elf_offset = elf_getProgramHeaderOffset(elf_blob, i);
+        void *src = (void *)((uintptr_t)elf_blob + elf_offset);
+
+        vaddr_t dst_vaddr = elf_getProgramHeaderVaddr(elf_blob, i);
+        void *dst = (void *)(dst_vaddr + info->phys_virt_offset);
+
+        size_t size = elf_getProgramHeaderFileSize(elf_blob, i);
+
+        /* Skip segments that are not marked as being loadable. */
+        if (PT_LOAD != elf_getProgramHeaderType(elf_blob, i)) {
+            // print_copy_operation("  ", "ignore non-PT_LOAD segment", src,
+            //                      dst, size);
+            continue;
+        }
+
+        /* Skip empty segments */
+        if (0 == size) {
+            // print_copy_operation("  ", "ignore empty segment", src, dst,
+            //                      size);
+            continue;
+        }
+
+        /* copy segment from CPIO to target memory location */
+        print_copy_operation("  ", "copy segment", src, dst, size);
+        memcpy(dst, src, size);
+    }
 
     /* Round up the destination address to the next page */
-    dest_paddr = ROUND_UP(dest_paddr + image_size, PAGE_BITS);
+    paddr = ROUND_UP(paddr + image_size, PAGE_BITS);
 
     if (keep_headers) {
         /* Put the ELF headers in this page */
@@ -335,49 +349,331 @@ static int load_elf(
             source_paddr = (paddr_t)elf64_getProgramHeaderTable(elf_blob);
         }
         /* We have no way of sharing definitions with the kernel so we just
-         * memcpy to a bunch of magic offsets. Explicit numbers for sizes
-         * and offsets are used so that it is clear exactly what the layout
-         * is */
-        memcpy((void *)dest_paddr, &phnum, 4);
-        memcpy((void *)(dest_paddr + 4), &phsize, 4);
-        memcpy((void *)(dest_paddr + 8), (void *)source_paddr, phsize * phnum);
+         * memcpy to a bunch of magic offsets. Explicit numbers for sizes and
+         * offsets are used so that it is clear exactly what the layout is
+         */
+        memcpy((void *)paddr, &phnum, 4);
+        memcpy((void *)(paddr + 4), &phsize, 4);
+        memcpy((void *)(paddr + 8), (void *)source_paddr, phsize * phnum);
         /* return the frame after our headers */
-        dest_paddr += KEEP_HEADERS_SIZE;
+        paddr += KEEP_HEADERS_SIZE;
     }
 
-    if (next_phys_addr) {
-        *next_phys_addr = dest_paddr;
-    }
+    *p_paddr = paddr;
     return 0;
 }
 
 /*
- * ELF-loader for ARM systems.
+ * Load the kernel ELF
+ */
+static int load_kernel_elf(
+    void const *cpio,
+    size_t cpio_len,
+    struct image_info *kernel_info,
+    paddr_t *next_phys_addr)
+{
+    int ret;
+    char const *const kernel_filename = "kernel.elf";
+
+    printf("ELF-loading kernel\n");
+
+    /* Locate the kernel in the CPIO archive */
+    unsigned long cpio_file_size = 0;
+    void const *elf_blob = cpio_get_file(cpio, cpio_len, kernel_filename,
+                                         &cpio_file_size);
+    if (!elf_blob) {
+        printf("ERROR: No kernel image present in archive\n");
+        return -1;
+    }
+
+    /* Ensure we can safely cast the CPIO API type to our preferred type. */
+    _Static_assert(sizeof(cpio_file_size) <= sizeof(size_t),
+                   "integer model mismatch");
+    size_t elf_blob_size = cpio_file_size;
+    print_info_cpio_file("  ", "ELF", elf_blob, elf_blob_size);
+
+    /* Kernel must be the first image in the archive. */
+    char const *filename = NULL;
+    cpio_get_entry(cpio, cpio_len, 0, &filename, NULL);
+    ret = strcmp(kernel_filename, filename);
+    if (0 != ret) {
+        printf("ERROR: Kernel image not first image in archive\n");
+        return -1;
+    }
+
+    /* check hash (if enabled) */
+    ret = check_hash(cpio, cpio_len, elf_blob, elf_blob_size, "kernel.bin");
+    if (0 != ret) {
+        printf("Hash check failed!\n");
+        return -1;
+    }
+
+    /* ensure the ELF file is a valid ELF */
+    if (0 != elf_checkFile(elf_blob)) {
+        printf("ERROR: Kernel image not a valid ELF file\n");
+        return -1;
+    }
+
+    /* Get physical memory bounds. Unlike most other functions, this returns 1
+     * on success and anything else is an error.
+     */
+    uint64_t phys_start = 0;
+    uint64_t phys_end = 0;
+    ret = elf_getMemoryBounds(elf_blob, 1, &phys_start, &phys_end);
+    if (1 != ret) {
+        printf("ERROR: could not get kernel memory bounds\n");
+        return -1;
+    }
+
+    /* Load the kernel from the ELF blob, don't keep ELF headers, throw the
+     * value returned phys_addr away. */
+    paddr_t phys_addr = (paddr_t)phys_start;
+    ret = load_elf(elf_blob, 0, &phys_addr, kernel_info);
+    if (0 != ret) {
+        printf("ERROR: could not load kernel ELF!\n");
+        return -1;
+    }
+
+    /* keep it page aligned */
+    *next_phys_addr = (paddr_t)ROUND_UP(phys_end, PAGE_BITS);
+    return 0;
+}
+
+/*
+ * install the DTB
+ */
+static int install_dtb(
+    void const *cpio,
+    size_t cpio_len,
+    void const *bootloader_dtb,
+    paddr_t *next_phys_addr,
+    unsigned int *user_elf_offset,
+    void const **ret_dtb,
+    size_t *ret_dtb_size)
+{
+    int ret;
+
+    printf("installing DTB\n");
+
+    /* set default to indicate there is no DTB */
+    if (ret_dtb) {
+        *ret_dtb = NULL;
+    }
+
+    if (ret_dtb_size) {
+        *ret_dtb_size = 0;
+    }
+
+    void const *dtb = NULL;
+    size_t dtb_cpio_file_size = 0;
+
+#ifdef CONFIG_ELFLOADER_INCLUDE_DTB
+
+    char const *const dtb_name = "kernel.dtb";
+    unsigned long cpio_file_size = 0;
+    dtb = cpio_get_file(cpio, cpio_len, dtb_name, &cpio_file_size);
+    if (!dtb) {
+        printf("  CPIO has no DTB\n");
+    } else {
+        /* Ensure we can safely cast the CPIO API type to our preferred type. */
+        _Static_assert(sizeof(cpio_file_size) <= sizeof(size_t),
+                       "integer model mismatch");
+        dtb_cpio_file_size = (size_t)cpio_file_size;
+        print_info_cpio_file("  ", "DTB", dtb, dtb_cpio_file_size);
+
+        /* if a DTB is present, it must be the second image in the archive */
+        char const *elf_filename;
+        cpio_get_entry(cpio, cpio_len, 1, &elf_filename, NULL);
+        ret = strcmp(elf_filename, dtb_name);
+        if (0 !=  ret) {
+            printf("ERROR: Kernel DTB not second image in archive.\n");
+            return -1;
+        }
+        /* user images start after DTB */
+        *user_elf_offset += 1;
+    }
+
+#endif /* CONFIG_ELFLOADER_INCLUDE_DTB */
+
+    /* Use DTB from bootloader if CPIO does not contain one */
+    if (!dtb) {
+        if (!bootloader_dtb) {
+            printf("DBT processing disabled\n");
+            /* ret_dtb and ret_dtb_size were already set to indicate there is no
+             * DTB, next_phys_addr is simply left unchanged
+             */
+            return 0;
+        }
+
+        dtb = bootloader_dtb;
+        printf("  Using DBT from bootloader at %p.\n", dtb);
+    }
+
+    /* We have a DTB, either from the CPIO or from the booloader. Check that it
+     * is valid and put it after the kernel. */
+    size_t dtb_size = fdt_size(dtb);
+    if (0 == dtb_size) {
+        printf("ERROR: Invalid device tree blob supplied!\n");
+        return -1;
+    }
+
+    if ((0 != dtb_cpio_file_size) && (dtb_size > dtb_cpio_file_size)) {
+        printf("ERROR: parsed device tree (%zu byte) larger than CPIO file (%zu byte)\n",
+               dtb_size, dtb_cpio_file_size);
+        return -1;
+    }
+
+    paddr_t phys_start = *next_phys_addr;
+    paddr_t phys_end = phys_start + dtb_size;
+
+    print_copy_operation("  ", "put DTB behind kernel", dtb, (void *)phys_start,
+                         dtb_size);
+
+    /* Make sure the physical location is sane */
+    ret = ensure_phys_range_valid(phys_start, phys_end);
+    if (0 != ret) {
+        printf("ERROR: Physical target address of DTB invalid!\n");
+        return -1;
+    }
+
+    memmove((void *)phys_start, dtb, dtb_size);
+
+    if (next_phys_addr) {
+        *next_phys_addr = ROUND_UP(phys_end, PAGE_BITS);
+    }
+
+    if (ret_dtb) {
+        *ret_dtb = (void *)phys_start;
+    }
+
+    if (ret_dtb_size) {
+        *ret_dtb_size = dtb_size;
+    }
+
+    return 0;
+}
+
+/*
+ * Install userspace images.
  *
- * We are currently running out of physical memory, with an ELF file for the
- * kernel and one or more ELF files for the userspace image. (Typically there
- * will only be one userspace ELF file, though if we are running a multi-core
- * CPU, we may have multiple userspace images; one per CPU.) These ELF files
- * are packed into an 'ar' archive.
+ * All we support is loading the images into memory. The kernel or root task
+ * may then decide how to handle this, e.g. run the n'th user image in the n'th
+ * core.
+ */
+static int load_app_images(
+    void const *cpio,
+    size_t cpio_len,
+    unsigned int user_elf_offset,
+    unsigned int max_user_images,
+    struct image_info *user_info,
+    unsigned int *num_images,
+    paddr_t *p_next_phys_addr)
+{
+    int ret;
+    paddr_t next_phys_addr = *p_next_phys_addr;
+
+#ifdef CONFIG_ELFLOADER_ROOTSERVERS_LAST
+
+    /* calculate the size of the user images - this corresponds to how much
+     * memory load_elf uses
+     */
+    unsigned int total_user_image_size = 0;
+    for (unsigned int i = 0; i < max_user_images; i++) {
+        void const *elf_blob = cpio_get_entry(cpio,
+                                              cpio_len,
+                                              user_elf_offset + i,
+                                              NULL,
+                                              NULL);
+        if (!elf_blob) {
+            break;
+        }
+
+        /* Get the memory bounds. Unlike most other functions, this returns 1 on
+         * success and anything else is an error.
+         */
+        uint64_t min_vaddr, max_vaddr;
+        int ret = elf_getMemoryBounds(elf_blob, 0, &min_vaddr, &max_vaddr);
+        if (ret != 1) {
+            printf("ERROR: Could not get bounds for image %u\n", i);
+            return -1;
+        }
+        /* round up size to the end of the page next page */
+        total_user_image_size += (ROUND_UP(max_vaddr, PAGE_BITS) - min_vaddr)
+                                 + KEEP_HEADERS_SIZE;
+    }
+
+    /* calculate location if the the user image */
+    next_phys_addr = ROUND_DOWN(memory_region[0].end, PAGE_BITS)
+                     - ROUND_UP(total_user_image_size, PAGE_BITS);
+
+#endif /* CONFIG_ELFLOADER_ROOTSERVERS_LAST */
+
+    unsigned int img_cnt = 0;
+    for (unsigned int i = 0; i < max_user_images; i++) {
+
+        /* Fetch info about the next ELF file in the archive. */
+        char const *elf_filename;
+        unsigned long cpio_file_size = 0;
+        void const *elf_blob = cpio_get_entry(cpio,
+                                              cpio_len,
+                                              user_elf_offset + i,
+                                              &elf_filename,
+                                              &cpio_file_size);
+        if (!elf_blob) {
+            break;
+        }
+
+        /* Ensure we can safely cast the CPIO API type to our preferred type. */
+        _Static_assert(sizeof(cpio_file_size) <= sizeof(size_t),
+                       "integer model mismatch");
+        size_t elf_blob_size = (size_t)cpio_file_size;
+
+        /* Print diagnostics. */
+        printf("ELF loading app '%s'\n", elf_filename);
+        print_info_cpio_file("  ", "ELF", elf_blob, elf_blob_size);
+
+        /* check hash (if enabled) */
+        ret = check_hash(cpio, cpio_len, elf_blob, elf_blob_size, "app.bin");
+        if (0 != ret) {
+            printf("ERROR: Hash check failed\n");
+            return -1;
+        }
+
+        /* Load the file into memory, keep ELF headers */
+        ret = load_elf(elf_blob, 1, &next_phys_addr, &user_info[i]);
+        if (0 != ret) {
+            printf("ERROR: could not load user image ELF!\n");
+            return -1;
+        }
+
+        /* Since we could load the image successfully and we don't do any
+         * cleanup on error, we can also let the caller know how many images
+         * we could load successfully.
+         */
+        *num_images = ++img_cnt;
+        *p_next_phys_addr = next_phys_addr;
+    }
+
+    return 0;
+}
+
+/*
+ * Load ELF images
  *
- * The kernel ELF file indicates what physical address it wants to be loaded
- * at, while userspace images run out of virtual memory, so don't have any
- * requirements about where they are located. We place the kernel at its
- * desired location, and then load userspace images straight after it in
+ * We assume that the MMU is disabled and we are running on physical memory
+ * here. We have to load a kerne ELF file and one or more ELF files for the
+ * userspace applications. Typically there will only be one userspace ELF file,
+ * though if we are running a multi-core CPU, we may have multiple userspace
+ * images, one per CPU. All ELF files are packed into a CPIO archive.
+ * The kernel ELF file indicates what physical address it wants to be loaded at,
+ * while userspace images run purely from virtual memory and don't have any
+ * requirements about where they are located physically. We place the kernel at
+ * its desired  location, and then load userspace images straight after it in
  * physical memory.
- *
- * Several things could possibly go wrong:
- *
- *  1. The physical load address of the kernel might want to overwrite this
- *  ELF-loader;
- *
- *  2. The physical load addresses of the kernel might not actually be in
- *  physical memory;
- *
- *  3. Userspace images may not fit in physical memory, or may try to overlap
- *  the ELF-loader.
- *
- *  We attempt to check for some of these, but some may go unnoticed.
+ * Several things could go wrong here, the images (including the kernel) might
+ * not even match the current memory configuration be broken, so we have to do a
+ * lot of sanity checks. Especially, we should never overwrite our own code and
+ * thn get completely lost.
  */
 int load_images(
     struct image_info *kernel_info,
@@ -389,223 +685,53 @@ int load_images(
     size_t *chosen_dtb_size)
 {
     int ret;
-    uint64_t kernel_phys_start, kernel_phys_end;
-    uintptr_t dtb_phys_start, dtb_phys_end;
-    paddr_t next_phys_addr;
-    const char *elf_filename;
-    int has_dtb_cpio = 0;
+
+    /* Set safe defaults. */
+    if (num_images) {
+        *num_images = 0;
+    }
+
+    if (chosen_dtb) {
+        *chosen_dtb = NULL;
+    }
+
+    if (chosen_dtb_size) {
+        *chosen_dtb_size = 0;
+    }
 
     void const *cpio = _archive_start;
     size_t cpio_len = _archive_start_end - _archive_start;
+    paddr_t next_phys_addr = 0;
+    unsigned int user_elf_offset = 1;
 
-    /* Load kernel. */
-    unsigned long cpio_file_size = 0;
-    void const *kernel_elf_blob = cpio_get_file(cpio,
-                                                cpio_len,
-                                                "kernel.elf",
-                                                &cpio_file_size);
-    if (kernel_elf_blob == NULL) {
-        printf("ERROR: No kernel image present in archive\n");
-        return -1;
-    }
-
-    /* Ensure we can safely cast the CPIO API type to our preferred type. */
-    _Static_assert(sizeof(cpio_file_size) <= sizeof(size_t),
-                   "integer model mismatch");
-    size_t kernel_elf_blob_size = (size_t)cpio_file_size;
-
-    ret = elf_checkFile(kernel_elf_blob);
-    if (ret != 0) {
-        printf("ERROR: Kernel image not a valid ELF file\n");
-        return -1;
-    }
-
-    /* Get physical memory bounds. Unlike most other functions, this returns 1
-     * on success and anything else is an error.
-     */
-    ret = elf_getMemoryBounds(kernel_elf_blob, 1, &kernel_phys_start,
-                              &kernel_phys_end);
-    if (1 != ret) {
-        printf("ERROR: Could not get kernel memory bounds\n");
-        return -1;
-    }
-
-    void const *dtb = NULL;
-
-#ifdef CONFIG_ELFLOADER_INCLUDE_DTB
-
-    if (chosen_dtb) {
-        printf("Looking for DTB in CPIO archive...");
-        /*
-         * Note the lack of newline in the above printf().  Normally one would
-         * have an fflush(stdout) here to ensure that the message shows up on a
-         * line-buffered stream (which is the POSIX default on terminal
-         * devices).  But we are freestanding (on the "bare metal"), and using
-         * our own unbuffered printf() implementation.
-         */
-        dtb = cpio_get_file(cpio, cpio_len, "kernel.dtb", NULL);
-        if (dtb == NULL) {
-            printf("not found.\n");
-        } else {
-            has_dtb_cpio = 1;
-            printf("found at %p.\n", dtb);
-        }
-    }
-
-#endif /* CONFIG_ELFLOADER_INCLUDE_DTB */
-
-    if (chosen_dtb && !dtb && bootloader_dtb) {
-        /* Use the bootloader's DTB if we are not using the DTB in the CPIO
-         * archive.
-         */
-        dtb = bootloader_dtb;
-    }
-
-    /*
-     * Move the DTB out of the way, if it's present.
-     */
-    if (dtb) {
-        /* keep it page aligned */
-        next_phys_addr = dtb_phys_start = ROUND_UP(kernel_phys_end, PAGE_BITS);
-
-        size_t dtb_size = fdt_size(dtb);
-        if (0 == dtb_size) {
-            printf("ERROR: Invalid device tree blob supplied\n");
-            return -1;
-        }
-
-        /* Make sure this is a sane thing to do */
-        ret = ensure_phys_range_valid(next_phys_addr,
-                                      next_phys_addr + dtb_size);
-        if (0 != ret) {
-            printf("ERROR: Physical address of DTB invalid\n");
-            return -1;
-        }
-
-        memmove((void *)next_phys_addr, dtb, dtb_size);
-        next_phys_addr += dtb_size;
-        next_phys_addr = ROUND_UP(next_phys_addr, PAGE_BITS);
-        dtb_phys_end = next_phys_addr;
-
-        printf("Loaded DTB from %p.\n", dtb);
-        printf("   paddr=[%p..%p]\n", dtb_phys_start, dtb_phys_end - 1);
-        *chosen_dtb = (void *)dtb_phys_start;
-        *chosen_dtb_size = dtb_size;
-    } else {
-        next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
-    }
-
-    /* Load the kernel */
-    ret = load_elf(cpio,
-                   cpio_len,
-                   "kernel",
-                   kernel_elf_blob,
-                   kernel_elf_blob_size,
-                   "kernel.bin", // hash file
-                   (paddr_t)kernel_phys_start,
-                   0, // don't keep ELF headers
-                   kernel_info,
-                   NULL); // we have calculated next_phys_addr already
-
+    /* load the kernel from CPIO */
+    ret = load_kernel_elf(cpio, cpio_len, kernel_info, &next_phys_addr);
     if (0 != ret) {
-        printf("ERROR: Could not load kernel ELF\n");
+        printf("ERROR: loading kernel failed!\n");
         return -1;
     }
 
-    /*
-     * Load userspace images.
-     *
-     * We assume (and check) that the kernel is the first file in the archive,
-     * that the DTB is the second if present,
-     * and then load the (n+user_elf_offset)'th file in the archive onto the
-     * (n)'th CPU.
+    /* Install device tree binary after kernel, it can come either from CPIO or
+     * is passed by the previous bootloader.
      */
-    unsigned int user_elf_offset = 2;
-    cpio_get_entry(cpio, cpio_len, 0, &elf_filename, NULL);
-    ret = strcmp(elf_filename, "kernel.elf");
+    ret = install_dtb(cpio,
+                      cpio_len,
+                      bootloader_dtb,
+                      &next_phys_addr,
+                      &user_elf_offset,
+                      chosen_dtb,
+                      chosen_dtb_size);
     if (0 != ret) {
-        printf("ERROR: Kernel image not first image in archive\n");
+        printf("ERROR: loading DTB failed!\n");
         return -1;
     }
-    cpio_get_entry(cpio, cpio_len, 1, &elf_filename, NULL);
-    ret = strcmp(elf_filename, "kernel.dtb");
+
+    /* Load app images. */
+    ret = load_app_images(cpio, cpio_len, user_elf_offset, max_user_images,
+                          user_info, num_images, &next_phys_addr);
     if (0 != ret) {
-        if (has_dtb_cpio) {
-            printf("ERROR: Kernel DTB not second image in archive\n");
-            return -1;
-        }
-        user_elf_offset = 1;
-    }
-
-#ifdef CONFIG_ELFLOADER_ROOTSERVERS_LAST
-
-    /* work out the size of the user images - this corresponds to how much
-     * memory load_elf uses */
-    unsigned int total_user_image_size = 0;
-    for (unsigned int i = 0; i < max_user_images; i++) {
-        void const *user_elf = cpio_get_entry(cpio,
-                                              cpio_len,
-                                              i + user_elf_offset,
-                                              NULL,
-                                              NULL);
-        if (user_elf == NULL) {
-            break;
-        }
-        /* Get the memory bounds. Unlike most other functions, this returns 1 on
-         * success and anything else is an error.
-         */
-        uint64_t min_vaddr, max_vaddr;
-        int ret = elf_getMemoryBounds(user_elf, 0, &min_vaddr, &max_vaddr);
-        if (ret != 1) {
-            printf("ERROR: Could not get image bounds\n");
-            return -1;
-        }
-        /* round up size to the end of the page next page */
-        total_user_image_size += (ROUND_UP(max_vaddr, PAGE_BITS) - min_vaddr)
-                                 + KEEP_HEADERS_SIZE;
-    }
-
-    /* work out where to place the user image */
-
-    next_phys_addr = ROUND_DOWN(memory_region[0].end, PAGE_BITS)
-                     - ROUND_UP(total_user_image_size, PAGE_BITS);
-
-#endif /* CONFIG_ELFLOADER_ROOTSERVERS_LAST */
-
-    *num_images = 0;
-    for (unsigned int i = 0; i < max_user_images; i++) {
-        /* Fetch info about the next ELF file in the archive. */
-        unsigned long cpio_file_size = 0;
-        void const *user_elf = cpio_get_entry(cpio,
-                                              cpio_len,
-                                              i + user_elf_offset,
-                                              &elf_filename,
-                                              &cpio_file_size);
-        if (user_elf == NULL) {
-            break;
-        }
-
-        /* Ensure we can safely cast the CPIO API type to our preferred type. */
-        _Static_assert(sizeof(cpio_file_size) <= sizeof(size_t),
-                       "integer model mismatch");
-        size_t elf_filesize = (size_t)cpio_file_size;
-
-        /* Load the file into memory. */
-        ret = load_elf(cpio,
-                       cpio_len,
-                       elf_filename,
-                       user_elf,
-                       elf_filesize,
-                       "app.bin", // hash file
-                       next_phys_addr,
-                       1,  // keep ELF headers
-                       &user_info[*num_images],
-                       &next_phys_addr);
-        if (0 != ret) {
-            printf("ERROR: Could not load user image ELF\n");
-        }
-
-        *num_images = i + 1;
+        printf("loading userspace failed!\n");
+        return -1;
     }
 
     return 0;
