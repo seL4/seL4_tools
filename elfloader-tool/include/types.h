@@ -1,5 +1,6 @@
 /*
  * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2021, HENSOLDT Cyber
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
@@ -85,12 +86,14 @@ typedef uint64_t    uintmax_t;
 
 typedef int32_t         intptr_t;
 typedef uint32_t        uintptr_t;
+#define UINTPTR_MAX     UINT32_MAX
 #define _ptr_type_fmt   /* empty */
 
 #elif defined(__KERNEL_64__)
 
 typedef int64_t         intptr_t;
 typedef uint64_t        uintptr_t;
+#define UINTPTR_MAX     UINT64_MAX
 #define _ptr_type_fmt   _int64_type_fmt
 
 #else
