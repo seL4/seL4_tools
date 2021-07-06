@@ -16,6 +16,11 @@ uint32_t _boot_pt[BIT(PT_BITS)] ALIGN(BIT(PT_SIZE_BITS));
 uint64_t _lpae_boot_pgd[BIT(HYP_PGD_BITS)] ALIGN(BIT(HYP_PGD_SIZE_BITS));
 uint64_t _lpae_boot_pmd[BIT(HYP_PGD_BITS + HYP_PMD_BITS)] ALIGN(BIT(HYP_PMD_SIZE_BITS));
 
+uint32_t _smmu_pd[BIT(PD_BITS)] ALIGN(BIT(PD_SIZE_BITS));
+uint32_t _smmu_pt_lo[BIT(PT_BITS)] ALIGN(BIT(PT_SIZE_BITS));
+uint32_t _smmu_pt_mid[BIT(PT_BITS)] ALIGN(BIT(PT_SIZE_BITS));
+uint32_t _smmu_pt_hi[BIT(PT_BITS)] ALIGN(BIT(PT_SIZE_BITS));
+
 /*
  * These are helper functions which let the ASM work when we're relocated,
  * and save the ASM from manually having to figure out offsets to access these.

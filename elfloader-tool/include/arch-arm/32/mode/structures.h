@@ -26,6 +26,7 @@
 #define HYP_PMD_BITS          9
 #define HYP_PMD_SIZE_BITS     (HYP_PMD_BITS + HYP_PMDE_SIZE_BITS)
 
+#define GET_PD_INDEX(x)       (((x) >> (PAGE_BITS + PT_BITS)) & MASK(PD_BITS))
 #define GET_PT_INDEX(x)       (((x) >> (PAGE_BITS)) & MASK(PT_BITS))
 
 extern uint32_t _boot_pd[BIT(PD_BITS)];
@@ -34,3 +35,7 @@ extern uint32_t _boot_pt[BIT(PT_BITS)];
 extern uint64_t _lpae_boot_pgd[BIT(HYP_PGD_BITS)];
 extern uint64_t _lpae_boot_pmd[BIT(HYP_PGD_BITS + HYP_PMD_BITS)];
 
+extern uint32_t _smmu_pd[BIT(PD_BITS)];
+extern uint32_t _smmu_pt_lo[BIT(PT_BITS)];
+extern uint32_t _smmu_pt_mid[BIT(PT_BITS)];
+extern uint32_t _smmu_pt_hi[BIT(PT_BITS)];

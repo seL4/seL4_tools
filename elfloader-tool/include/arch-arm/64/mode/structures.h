@@ -40,5 +40,5 @@ extern uint64_t _boot_pud_down[BIT(PUD_BITS)];
 extern uint64_t _smmu_pgd[BIT(PGD_BITS)];
 extern uint64_t _smmu_pud[BIT(PUD_BITS)];
 extern uint64_t _smmu_pmd[BIT(PGD_BITS)];
-extern uint64_t _smmu_pte_lo[BIT(PTE_BITS)];
-extern uint64_t _smmu_pte_hi[BIT(PTE_BITS)];
+extern uint64_t _smmu_pt_lo[BIT(PTE_BITS)];
+extern uint64_t _smmu_pt_hi[BIT(PTE_BITS)];
