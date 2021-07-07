@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.8.2)
 include_guard(GLOBAL)
 
 function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
-    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;zynqmp;imx8mm-evk;hifive")
+    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;zynqmp;imx8mm-evk;hifive;bcm2837")
     set(efi_list "tk1;rockpro64")
     set(uimage_list "tx2;am335x")
     if(
@@ -19,9 +19,6 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(ElfloaderImage "efi" CACHE STRING "" FORCE)
     elseif(${kernel_platform} IN_LIST uimage_list)
         set(ElfloaderImage "uimage" CACHE STRING "" FORCE)
-        #rpi3
-    elseif(${kernel_platform} STREQUAL "bcm2837" AND ${kernel_sel4_arch} STREQUAL "aarch64")
-        set(ElfloaderImage "binary" CACHE STRING "" FORCE)
         #rpi4
     elseif(${kernel_platform} STREQUAL "bcm2711" AND ${kernel_sel4_arch} STREQUAL "aarch64")
         set(ElfloaderImage "efi" CACHE STRING "" FORCE)
