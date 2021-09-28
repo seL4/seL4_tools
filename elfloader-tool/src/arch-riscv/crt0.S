@@ -52,7 +52,7 @@ _start:
 
   /* save the parameters passed */
   mv s0, a0 /* preserve a0 (hart id) in s0 */
-  mv s2, a1 /* preserve a1 (dtb) in s2 */
+  mv s1, a1 /* preserve a1 (dtb) in s1 */
 
 #ifdef CONFIG_IMAGE_BINARY
 /* Clear the BSS before we get to do anything more specific */
@@ -80,8 +80,8 @@ _start:
   amoadd.w t1, t2, (t1)
 
   /*  Check if we are on CONFIG_FIRST_HART_ID */
-  li s1, CONFIG_FIRST_HART_ID
-  beq  a0, s1, _start1 /* goto _start1 if we are on CONFIG_FIRST_HART_ID */
+  li t0, CONFIG_FIRST_HART_ID
+  beq  a0, t0, _start1 /* goto _start1 if we are on CONFIG_FIRST_HART_ID */
 
   /* Use HSM extension to start hart CONFIG_FIRST_HART_ID. */
 hsm_switch_hart:
@@ -115,9 +115,9 @@ _start1: /* a0 must hold current hard ID passed by bootloader */
    *   a0 = hart id
    *   a1 = dtb
    */
-  mv a1, s2 /* restore dtb passed on entry */
-  la s0, main
-  jr s0
+  mv a1, s1 /* restore dtb passed on entry */
+  la t1, main
+  jr t1 /* don't use t0 (x5), it's a designated additional link register */
 
 #if CONFIG_MAX_NUM_NODES > 1
 .extern next_logical_core_id
@@ -150,8 +150,8 @@ secondary_harts:
   slli t0, t0, 12
   la sp, bootstack_secondary_cores
   add sp, sp, t0
-  la s0, secondary_entry
-  jr s0
+  la t1, secondary_entry
+  jr t1 /* don't use t0 (x5), it's a designated additional link register */
 #endif
 spin_hart:
   wfi
