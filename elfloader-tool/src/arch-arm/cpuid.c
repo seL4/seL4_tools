@@ -84,20 +84,96 @@ OPTIMIZE_CHANGE static const char *cpuid_get_arch_str(uint32_t cpuid)
 }
 
 
+OPTIMIZE_CHANGE static const char *cpuid_get_arm_part_str(uint32_t cpuid)
+{
+    switch (CPUID_PART(cpuid)) {
+    case 0xC05:
+        return "Cortex-A5";
+    case 0xC07:
+        return "Cortex-A7";
+    case 0xC08:
+        return "Cortex-A8";
+    case 0xC09:
+        return "Cortex-A9";
+    case 0xC0D:
+        return "Cortex-A12";
+    case 0xC0F:
+        return "Cortex-A15";
+    case 0xC0E:
+        return "Cortex-A17";
+    case 0xD01:
+        return "Cortex-A32";
+    case 0xD02:
+        return "Cortex-A34";
+    case 0xD03:
+        return "Cortex-A53";
+    case 0xD04:
+        return "Cortex-A35";
+    case 0xD05:
+        return "Cortex-A55";
+    case 0xD06:
+        return "Cortex-A65";
+    case 0xD07:
+        return "Cortex-A57";
+    case 0xD08:
+        return "Cortex-A72";
+    case 0xD09:
+        return "Cortex-A73";
+    case 0xD0A:
+        return "Cortex-A75";
+    case 0xD0B:
+        return "Cortex-A76";
+    case 0xD0C:
+        return "Neoverse N1";
+    case 0xD0D:
+        return "Cortex-A77";
+    case 0xD0E:
+        return "Cortex-A76AE";
+    case 0xD40:
+        return "Neoverse V1";
+    case 0xD41:
+        return "Cortex-A78";
+    case 0xD42:
+        return "Cortex-A78AE";
+    case 0xD43:
+        return "Cortex-A65AE";
+    case 0xD44:
+        return "Cortex-X1";
+    case 0xD46:
+        return "Cortex-A510";
+    case 0xD47:
+        return "Cortex-A710";
+    case 0xD48:
+        return "Cortex-X2";
+    case 0xD49:
+        return "Neoverse N2";
+    case 0xD4A:
+        return "Neoverse E1";
+    case 0xD4B:
+        return "Cortex-78C";
+    default:
+        return NULL;
+    }
+}
+
 void print_cpuid(void)
 {
     uint32_t cpuid;
+    const char *part = NULL;
     cpuid = read_cpuid_id();
+
+    if (CPUID_IMPL(cpuid) == CPUID_IMPL_ARM) {
+        part = cpuid_get_arm_part_str(cpuid);
+    }
+
     printf("CPU: %s ", cpuid_get_implementer_str(cpuid));
     if (CPUID_ARCH(cpuid) != CPUID_ARCH_CPUID) {
         printf("%s ", cpuid_get_arch_str(cpuid));
     }
-    if ((CPUID_PART(cpuid) & 0xf00) == 0xC00) {
-        printf("Cortex-A%d ", CPUID_PART(cpuid) & 0xff);
-    } else if ((CPUID_PART(cpuid) & 0xf00) == 0xD00) {
-        printf("Cortex-A5%d ", CPUID_PART(cpuid) & 0xff);
-    } else {
+    if (part == NULL) {
         printf("Part: 0x%03x ", CPUID_PART(cpuid));
+    } else {
+        printf("%s ", part);
     }
 
     printf("r%dp%d", CPUID_MAJOR(cpuid), CPUID_MINOR(cpuid));

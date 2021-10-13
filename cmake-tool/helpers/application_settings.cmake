@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.8.2)
 include_guard(GLOBAL)
 
 function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
-    set(binary_list "tx1;hikey;odroidc2;imx8mq-evk;zynqmp;imx8mm-evk;hifive")
+    set(binary_list "tx1;hikey;odroidc2;odroidc4;imx8mq-evk;zynqmp;imx8mm-evk;hifive;tqma8xqp1gb")
     set(efi_list "tk1;rockpro64")
     set(uimage_list "tx2;am335x")
     if(
@@ -157,7 +157,6 @@ function(correct_platform_strings)
         #
         "-KernelARMPlatform"
         "imx6:sabre,wandq,nitrogen6sx"
-        "imx31:kzm"
         "bcm2837:rpi3"
         "bcm2711:rpi4"
         "exynos5:exynos5250,exynos5410,exynos5422"

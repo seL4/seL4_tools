@@ -1,10 +1,22 @@
 /*
  * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2021, HENSOLDT Cyber
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
 #pragma once
+
+/*------------------------------------------------------------------------------
+ * _Static_assert() is a c11 feature, emulate it for older versions.
+ */
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#define compile_assert(name, expr)   _Static_assert(expr, #name);
+#else
+#define compile_assert(name, expr) \
+    typedef int __assert_failed_##name[(expr) ? 1 : -1] __attribute__((unused));
+#endif
+
 
 /*------------------------------------------------------------------------------
  * helper macro that ensure the passed macro gets evaluated first before the
@@ -48,6 +60,8 @@ typedef unsigned int    uint32_t;
 #error expecting either __KERNEL_32__ or __KERNEL_64__ to be defined
 #endif
 
+compile_assert(valid_int64_type, 8 == sizeof(_int64_type));
+
 typedef signed _int64_type      int64_t;
 typedef unsigned _int64_type    uint64_t;
 
@@ -85,12 +99,14 @@ typedef uint64_t    uintmax_t;
 
 typedef int32_t         intptr_t;
 typedef uint32_t        uintptr_t;
+#define UINTPTR_MAX     UINT32_MAX
 #define _ptr_type_fmt   /* empty */
 
 #elif defined(__KERNEL_64__)
 
 typedef int64_t         intptr_t;
 typedef uint64_t        uintptr_t;
+#define UINTPTR_MAX     UINT64_MAX
 #define _ptr_type_fmt   _int64_type_fmt
 
 #else
@@ -114,14 +130,11 @@ typedef uintptr_t   size_t;
  * word_t is practically an alias for size_t/uintptr_t on the platforms we
  * support so far.
  */
-#if defined(__KERNEL_32__)
-typedef uint32_t    word_t;
-#define PRI_word    "u"
-#elif defined(__KERNEL_64__)
-typedef uint64_t    word_t;
-#define PRI_word    PRIu64
-#else
-#error expecting either __KERNEL_32__ or __KERNEL_64__ to be defined
-#endif
+typedef uintptr_t    word_t;
+#define WORD_MAX     UINTPTR_MAX
 
-#define BYTE_PER_WORD   sizeof(word_t)
+/* printf() format specifiers for word_t */
+#define PRId_word   PRIdPTR
+#define PRIi_word   PRIiPTR
+#define PRIu_word   PRIuPTR
+#define PRIx_word   PRIxPTR
