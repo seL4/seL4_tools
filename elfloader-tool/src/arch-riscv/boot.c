@@ -64,6 +64,38 @@ char elfloader_stack[CONFIG_MAX_NUM_NODES * BIT(CONFIG_KERNEL_STACK_BITS)] __att
 void const *dtb = NULL;
 size_t dtb_size = 0;
 
+static inline void sfence_vma(void)
+{
+    asm volatile("sfence.vma" ::: "memory");
+}
+
+static inline void ifence(void)
+{
+    asm volatile("fence.i" ::: "memory");
+}
+
+#if CONFIG_PT_LEVELS == 2
+uint64_t vm_mode = 0x1llu << 31;
+#elif CONFIG_PT_LEVELS == 3
+uint64_t vm_mode = 0x8llu << 60;
+#elif CONFIG_PT_LEVELS == 4
+uint64_t vm_mode = 0x9llu << 60;
+#else
+#error "Wrong PT level"
+#endif
+
+static inline void enable_virtual_memory(void)
+{
+    sfence_vma();
+    asm volatile(
+        "csrw satp, %0\n"
+        :
+        : "r"(vm_mode | (uintptr_t)l1pt >> RISCV_PGSHIFT)
+        :
+    );
+    ifence();
+}
+
 /*
  * overwrite the default implementation for abort()
  */
@@ -134,16 +166,6 @@ static int map_kernel_window(struct image_info *kernel_info)
     return 0;
 }
 
-#if CONFIG_PT_LEVELS == 2
-uint64_t vm_mode = 0x1llu << 31;
-#elif CONFIG_PT_LEVELS == 3
-uint64_t vm_mode = 0x8llu << 60;
-#elif CONFIG_PT_LEVELS == 4
-uint64_t vm_mode = 0x9llu << 60;
-#else
-#error "Wrong PT level"
-#endif
-
 int hsm_exists = 0; /* assembly startup code will initialise this */
 
 #if CONFIG_MAX_NUM_NODES > 1
@@ -172,28 +194,6 @@ static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
 
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
-static inline void sfence_vma(void)
-{
-    asm volatile("sfence.vma" ::: "memory");
-}
-
-static inline void ifence(void)
-{
-    asm volatile("fence.i" ::: "memory");
-}
-
-static inline void enable_virtual_memory(void)
-{
-    sfence_vma();
-    asm volatile(
-        "csrw satp, %0\n"
-        :
-        : "r"(vm_mode | (uintptr_t)l1pt >> RISCV_PGSHIFT)
-        :
-    );
-    ifence();
-}
-
 static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 {
     int ret;
@@ -220,6 +220,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
 #if CONFIG_MAX_NUM_NODES > 1
+
     while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
     printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
     __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
@@ -237,6 +238,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
     set_and_wait_for_ready(hart_id, 0);
+
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
     printf("Enabling MMU and paging\n");
