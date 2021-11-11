@@ -101,12 +101,8 @@ hsm_switch_hart:
   mv a2, s2 /* dtb address to be passed in a1 when new hart starts is 3rd parameter */
   la a1, _start1 /* where to start the hart */
   ecall /* call SBI to start hart FIRST_HART_ID */
-
-  /* Since we are not the designated primary hart, continue the boot process as
-   * secondary hart
-   */
-  mv a0, s0 /* restore a0 to hold hart ID passed by OpenSBI */
-  j secondary_harts
+  /* Stop current hart, the boot code may bring it up again when needed. */
+  j hsm_suspend_hart
 
 /*----------------------------------------------------------------------------*/
 _start1:
@@ -117,7 +113,7 @@ _start1:
  * All that is left to be done here is setting up the registers gp and sp to
  * have a proper C environment. The hart we are running on now could be a
  * different HART to the one that we have been on in _start. The original hart
- * we came from will get a different stack in secondary_harts.
+ * we came from will get a different stack in hsm_entry_on_secondary_hart.
  */
 .option push
 .option norelax
@@ -130,8 +126,8 @@ _start1:
   jr s0
 
 /*----------------------------------------------------------------------------*/
-.global secondary_harts
-secondary_harts:
+.global hsm_entry_on_secondary_hart
+hsm_entry_on_secondary_hart:
 
 .option push
 .option norelax

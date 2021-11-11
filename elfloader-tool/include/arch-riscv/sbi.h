@@ -30,24 +30,43 @@
     a0;                         \
 })
 
+typedef enum {
+    SBI_SUCCESS                 = 0,
+    SBI_ERR_FAILED              = -1,
+    SBI_ERR_NOT_SUPPORTED       = -2,
+    SBI_ERR_INVALID_PARAM       = -3,
+    SBI_ERR_DENIED              = -4,
+    SBI_ERR_INVALID_ADDRESS     = -5,
+    SBI_ERR_ALREADY_AVAILABLE   = -6,
+    SBI_ERR_ALREADY_STARTED     = -7,
+    SBI_ERR_ALREADY_STOPPED     = -8
+} sbi_call_ret_t;
+
 #define  SBI_HSM 0x48534DULL
 #define  SBI_HSM_HART_START 0
 
-#define SBI_EXT_CALL(extension, which, arg0, arg1, arg2) ({  \
-    register word_t a0 asm ("a0") = (word_t)(arg0);   \
-    register word_t a1 asm ("a1") = (word_t)(arg1);   \
-    register word_t a2 asm ("a2") = (word_t)(arg2);   \
-    register word_t a6 asm ("a6") = (word_t)(which);  \
-    register word_t a7 asm ("a7") = (word_t)(extension); \
-    asm volatile ("ecall"                   \
-              : "+r" (a0)               \
-              : "r" (a1), "r" (a2), "r" (a6), "r" (a7)      \
-              : "memory");              \
-    a0;                         \
-})
+typedef struct {
+    sbi_call_ret_t code;
+    word_t data;
+} sbi_hsm_ret_t;
 
-#define SBI_HSM_CALL(which, arg0, arg1, arg2) \
-    SBI_EXT_CALL(SBI_HSM, (which), (arg0), (arg1), (arg2))
+#define SBI_EXT_CALL(extension, which, arg0, arg1, arg2, var_sbi_hsm_ret) \
+    do {  \
+        register word_t a0 asm ("a0") = (word_t)(arg0);   \
+        register word_t a1 asm ("a1") = (word_t)(arg1);   \
+        register word_t a2 asm ("a2") = (word_t)(arg2);   \
+        register word_t a6 asm ("a6") = (word_t)(which);  \
+        register word_t a7 asm ("a7") = (word_t)(extension); \
+        asm volatile ("ecall"                   \
+                : "+r" (a0), "+r" (a1)               \
+                : "r" (a2), "r" (a6), "r" (a7)      \
+                : "memory");              \
+        (var_sbi_hsm_ret).code = a0;                         \
+        (var_sbi_hsm_ret).data = a1;                         \
+    } while(0)
+
+#define SBI_HSM_CALL(which, arg0, arg1, arg2, var_sbi_hsm_ret) \
+    SBI_EXT_CALL(SBI_HSM, (which), (arg0), (arg1), (arg2), var_sbi_hsm_ret)
 
 /* Lazy implementations until SBI is finalized */
 #define SBI_CALL_0(which) SBI_CALL(which, 0, 0, 0)
@@ -111,9 +130,12 @@ static inline void sbi_remote_sfence_vma_asid(const word_t *hart_mask,
     SBI_CALL_1(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask);
 }
 
-static inline void sbi_hart_start(const word_t hart_id,
-                                  void (*start)(word_t hart_id, word_t arg),
-                                  word_t arg)
+static inline sbi_hsm_ret_t sbi_hart_start(const word_t hart_id,
+                                           void (*start)(word_t hart_id,
+                                                         word_t arg),
+                                           word_t arg)
 {
-    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, start, arg);
+    sbi_hsm_ret_t ret = { 0 };
+    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, start, arg, ret);
+    return ret;
 }
