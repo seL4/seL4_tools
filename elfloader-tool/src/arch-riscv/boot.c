@@ -176,17 +176,52 @@ int secondary_go = 0;
 int next_logical_core_id = 1; /* incremented by assembly code  */
 int mutex = 0;
 int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
+
+static void acquire_multicore_lock(void)
+{
+    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0) {
+        /* busy waiting loop */
+    }
+}
+
+static void release_multicore_lock(void)
+{
+    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
+}
+
+static void set_secondary_cores_go(void)
+{
+    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
+}
+
+static void block_until_secondary_cores_go(void)
+{
+    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) {
+        /* busy waiting loop */
+    }
+}
+
+static void mark_core_ready(int core_id)
+{
+    core_ready[core_id] = 1;
+}
+
+static int is_core_ready(int core_id)
+{
+    return (0 != __atomic_load_n(&core_ready[core_id], __ATOMIC_RELAXED));
+}
+
 static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
 {
     /* Acquire lock to update core ready array */
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
+    acquire_multicore_lock();
     printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
-    core_ready[core_id] = 1;
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
+    mark_core_ready(core_id);
+    release_multicore_lock();
 
     /* Wait until all cores are go */
     for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (__atomic_load_n(&core_ready[i], __ATOMIC_RELAXED) == 0) {
+        while (!is_core_ready(i)) {
             /* busy waiting loop */
         }
     }
@@ -220,14 +255,11 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
 #if CONFIG_MAX_NUM_NODES > 1
-
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
+    acquire_multicore_lock();
     printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
-
+    release_multicore_lock();
     /* Unleash secondary cores */
-    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
-
+    set_secondary_cores_go();
     /* Start all cores */
     word_t i = 0;
     while (i < CONFIG_MAX_NUM_NODES && hsm_exists) {
@@ -236,9 +268,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
             sbi_hart_start(i, secondary_harts, i);
         }
     }
-
     set_and_wait_for_ready(hart_id, 0);
-
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
     printf("Enabling MMU and paging\n");
@@ -267,18 +297,13 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 
 void secondary_entry(word_t hart_id, word_t core_id)
 {
-    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) ;
-
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
+    block_until_secondary_cores_go();
+    acquire_multicore_lock();
     printf("Secondary entry hart_id:%"PRIu_word" core_id:%"PRIu_word"\n",
            hart_id, core_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
-
+    release_multicore_lock();
     set_and_wait_for_ready(hart_id, core_id);
-
     enable_virtual_memory();
-
-
     /* If adding or modifying these parameters you will need to update
         the registers in head.S */
     ((init_riscv_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
