@@ -19,10 +19,10 @@
 #define SBI_SHUTDOWN 8
 
 #define SBI_CALL(which, arg0, arg1, arg2) ({            \
-    register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);   \
-    register uintptr_t a1 asm ("a1") = (uintptr_t)(arg1);   \
-    register uintptr_t a2 asm ("a2") = (uintptr_t)(arg2);   \
-    register uintptr_t a7 asm ("a7") = (uintptr_t)(which);  \
+    register word_t a0 asm ("a0") = (word_t)(arg0);   \
+    register word_t a1 asm ("a1") = (word_t)(arg1);   \
+    register word_t a2 asm ("a2") = (word_t)(arg2);   \
+    register word_t a7 asm ("a7") = (word_t)(which);  \
     asm volatile ("ecall"                   \
               : "+r" (a0)               \
               : "r" (a1), "r" (a2), "r" (a7)        \
@@ -34,11 +34,11 @@
 #define  SBI_HSM_HART_START 0
 
 #define SBI_EXT_CALL(extension, which, arg0, arg1, arg2) ({  \
-    register uintptr_t a0 asm ("a0") = (uintptr_t)(arg0);   \
-    register uintptr_t a1 asm ("a1") = (uintptr_t)(arg1);   \
-    register uintptr_t a2 asm ("a2") = (uintptr_t)(arg2);   \
-    register uintptr_t a6 asm ("a6") = (uintptr_t)(which);  \
-    register uintptr_t a7 asm ("a7") = (uintptr_t)(extension); \
+    register word_t a0 asm ("a0") = (word_t)(arg0);   \
+    register word_t a1 asm ("a1") = (word_t)(arg1);   \
+    register word_t a2 asm ("a2") = (word_t)(arg2);   \
+    register word_t a6 asm ("a6") = (word_t)(which);  \
+    register word_t a7 asm ("a7") = (word_t)(extension); \
     asm volatile ("ecall"                   \
               : "+r" (a0)               \
               : "r" (a1), "r" (a2), "r" (a6), "r" (a7)      \
@@ -86,34 +86,34 @@ static inline void sbi_clear_ipi(void)
     SBI_CALL_0(SBI_CLEAR_IPI);
 }
 
-static inline void sbi_send_ipi(const unsigned long *hart_mask)
+static inline void sbi_send_ipi(const word_t *hart_mask)
 {
     SBI_CALL_1(SBI_SEND_IPI, hart_mask);
 }
 
-static inline void sbi_remote_fence_i(const unsigned long *hart_mask)
+static inline void sbi_remote_fence_i(const word_t *hart_mask)
 {
     SBI_CALL_1(SBI_REMOTE_FENCE_I, hart_mask);
 }
 
-static inline void sbi_remote_sfence_vma(const unsigned long *hart_mask,
-                                         UNUSED unsigned long start,
-                                         UNUSED unsigned long size)
+static inline void sbi_remote_sfence_vma(const word_t *hart_mask,
+                                         UNUSED word_t start,
+                                         UNUSED word_t size)
 {
     SBI_CALL_1(SBI_REMOTE_SFENCE_VMA, hart_mask);
 }
 
-static inline void sbi_remote_sfence_vma_asid(const unsigned long *hart_mask,
-                                              UNUSED unsigned long start,
-                                              UNUSED unsigned long size,
-                                              UNUSED unsigned long asid)
+static inline void sbi_remote_sfence_vma_asid(const word_t *hart_mask,
+                                              UNUSED word_t start,
+                                              UNUSED word_t size,
+                                              UNUSED word_t asid)
 {
     SBI_CALL_1(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask);
 }
 
-static inline void sbi_hart_start(const unsigned long hart_id,
-                                  void (*start)(unsigned long),
-                                  unsigned long privilege)
+static inline void sbi_hart_start(const word_t hart_id,
+                                  void (*start)(word_t hart_id, word_t arg),
+                                  word_t arg)
 {
-    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, start, privilege);
+    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, start, arg);
 }
