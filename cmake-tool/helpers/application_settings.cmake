@@ -37,7 +37,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
     endif()
     if((KernelPlatformImx8mm-evk OR KernelPlatformImx8mq-evk OR KernelPlatformMaaxboard) AND KernelSel4ArchAarch32)
         set(ElfloaderArmV8LeaveAarch64 ON CACHE BOOL "" FORCE)
-        # This applies to imx8m, imx8mq and MaaxBoard when in aarch32 configuration
+        # This applies to imx8m, imx8mq and maaxboard when in aarch32 configuration
         # It should be possible to use a uimage format but when tried nothing
         # runs after uboot.
         set(IMAGE_START_ADDR 0x41000000 CACHE INTERNAL "" FORCE)
