@@ -35,8 +35,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(ElfloaderMode "hypervisor" CACHE STRING "" FORCE)
         set(ElfloaderMonitorHook ON CACHE BOOL "" FORCE)
     endif()
-    if((KernelPlatformImx8mm-evk OR KernelPlatformImx8mq-evk 
-        OR KernelPlatformMaaxboard) AND KernelSel4ArchAarch32)
+    if((KernelPlatformImx8mm-evk OR KernelPlatformImx8mq) AND KernelSel4ArchAarch32)
         set(ElfloaderArmV8LeaveAarch64 ON CACHE BOOL "" FORCE)
         # This applies to imx8m, imx8mq and maaxboard when in aarch32 configuration
         # It should be possible to use a uimage format but when tried nothing
