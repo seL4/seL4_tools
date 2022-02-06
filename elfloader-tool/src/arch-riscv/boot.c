@@ -144,14 +144,14 @@ uint64_t vm_mode = 0x9llu << 60;
 #error "Wrong PT level"
 #endif
 
-int hsm_exists = 0;
+int hsm_exists = 0; /* assembly startup code will initialise this */
 
 #if CONFIG_MAX_NUM_NODES > 1
 
 extern void secondary_harts(word_t hart_id, word_t core_id);
 
 int secondary_go = 0;
-int next_logical_core_id = 1;
+int next_logical_core_id = 1; /* incremented by assembly code  */
 int mutex = 0;
 int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
 static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
@@ -162,12 +162,15 @@ static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
     core_ready[core_id] = 1;
     __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 
-    /* Wait untill all cores are go */
+    /* Wait until all cores are go */
     for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (__atomic_load_n(&core_ready[i], __ATOMIC_RELAXED) == 0) ;
+        while (__atomic_load_n(&core_ready[i], __ATOMIC_RELAXED) == 0) {
+            /* busy waiting loop */
+        }
     }
 }
-#endif
+
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
 
 static inline void sfence_vma(void)
 {
@@ -234,7 +237,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
     set_and_wait_for_ready(hart_id, 0);
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
 
     printf("Enabling MMU and paging\n");
     enable_virtual_memory();
@@ -250,7 +253,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
                                                   ,
                                                   hart_id,
                                                   0
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
                                                  );
 
     /* We should never get here. */
@@ -287,7 +290,7 @@ void secondary_entry(word_t hart_id, word_t core_id)
                                                  );
 }
 
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
 
 void main(word_t hart_id, void *bootloader_dtb)
 {

@@ -107,28 +107,28 @@ hsm_switch_hart:
   mv a0, s0 /* restore a0 to hold hart ID passed by OpenSBI */
   j secondary_harts
 
-
-_start1: /* a0 must hold current hard ID passed by bootloader */
-         /* a1 must hold dtb address passed by bootloader */
+/*----------------------------------------------------------------------------*/
+_start1:
+/* This is basically an asm wrapper to jump to the C code at main(). The
+ * registers are already set up with the perameters for the C code:
+ *   a0 holds current hard ID passed by bootloader
+ *   a1 holds dtb address passed by bootloader
+ * All that is left to be done here is setting up the registers gp and sp to
+ * have a proper C environment. The hart we are running on now could be a
+ * different HART to the one that we have been on in _start. The original hart
+ * we came from will get a different stack in secondary_harts.
+ */
 .option push
 .option norelax
 1:auipc gp, %pcrel_hi(__global_pointer$)
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
-
-  /* Attach the stack to sp before calling any C functions */
-  /* This HART may be a different HART to the one that started at _start
-   * If we've switched HARTs then the other HART will get a different stack
-   * region in secondary_harts. */
   la sp, (elfloader_stack + BIT(CONFIG_KERNEL_STACK_BITS))
-  /* The C code expects the registers to be set up as:
-   *   a0 = hart id
-   *   a1 = dtb
-   */
+  /* Jump via a register, as this can cover a bigger range. */
   la s0, main
   jr s0
 
-
+/*----------------------------------------------------------------------------*/
 .global secondary_harts
 secondary_harts:
 
