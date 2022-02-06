@@ -57,7 +57,8 @@ unsigned long l2pt[PTES_PER_PT] __attribute__((aligned(4096)));
 unsigned long l2pt_elf[PTES_PER_PT] __attribute__((aligned(4096)));
 #endif
 
-char elfloader_stack_alloc[BIT(CONFIG_KERNEL_STACK_BITS)];
+/* Stacks for each core are set up in the assembly startup code. */
+char elfloader_stack[CONFIG_MAX_NUM_NODES * BIT(CONFIG_KERNEL_STACK_BITS)] __attribute__((aligned(4096)));
 
 /* first HART will initialise these */
 void const *dtb = NULL;
