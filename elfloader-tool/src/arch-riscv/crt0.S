@@ -167,14 +167,15 @@ secondary_harts:
 
 #if CONFIG_MAX_NUM_NODES > 1
   la a1, next_logical_core_id
-  li t2, 1
-  amoadd.w t0, t2, (a1)
-  /* now a1 has the logical core id */
-  li t2, CONFIG_MAX_NUM_NODES
-  bge t0, t2, hsm_suspend_hart
+  li t0, 1
+  /* atomically increment next_logical_core_id by one, afterwards a1 holds value
+   * before the update - which is our logical core ID.
+   */
+  amoadd.w a1, t0, (a1)
+  li t0, CONFIG_MAX_NUM_NODES
+  bge a1, t0, hsm_suspend_hart
 
-  mv a1, t0
-  addi t0, t0, 1
+  addi t0, a1, 1
   slli t0, t0, 12
   la sp, core_stack_alloc
   add sp, sp, t0
