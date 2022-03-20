@@ -35,6 +35,8 @@ def parse_args():
                         help="Kernel file to pass onto QEMU", default="@QEMU_SIM_KERNEL_FILE@")
     parser.add_argument('-i', '--initrd', dest='qemu_sim_initrd_file', type=str,
                         help="Initrd file to pass onto QEMU", default="@QEMU_SIM_INITRD_FILE@")
+    parser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true',
+                        help="Output qemu command, but do not run it")
     parser.add_argument('--extra-qemu-args', dest='qemu_sim_extra_args', type=str,
                         help="Additional arguments to pass onto QEMU", default="@QEMU_SIM_EXTRA_ARGS@")
     parser.add_argument('--extra-cpu-opts', dest='qemu_sim_extra_cpu_opts', type=str,
@@ -47,9 +49,7 @@ def parse_args():
 def notice(message):
     # Don't call this without initialising `progname`.
     assert(progname)
-    sys.stderr.write("{}: {}".format(progname, message))
-    sys.stderr.flush()
-
+    print("{}: {}".format(progname, message), file=sys.stderr)
 
 if __name__ == "__main__":
     args = parse_args()
@@ -80,23 +80,25 @@ if __name__ == "__main__":
                                   qemu_gdbserver_command]
     qemu_simulate_command = " ".join(qemu_simulate_command_opts)
 
-    notice(qemu_simulate_command)
-
     if qemu_gdbserver_command != "":
-        notice('waiting for GDB on port 1234...')
+        print(f'GDB command: {qemu_gdbserver_command}', file=sys.stderr)
+        if not args.dry_run:
+            notice('waiting for GDB on port 1234...')
 
-    qemu_status = subprocess.call(qemu_simulate_command, shell=True)
+    print(f'QEMU command: {qemu_simulate_command}', file=sys.stderr)
+    if not args.dry_run:
+        qemu_status = subprocess.call(qemu_simulate_command, shell=True)
 
-    if qemu_status != 0:
-        delay = 5  # in seconds
-        # Force a newline onto the output stream.
-        sys.stderr.write('\n')
-        msg = "QEMU failed; resetting terminal in {d} seconds".format(d=delay) \
-            + "--interrupt to abort\n"
-        notice(msg)
-    else:
-        delay = 2  # in seconds
+        if qemu_status != 0:
+            delay = 5  # in seconds
+            # Force a newline onto the output stream.
+            sys.stderr.write('\n')
+            msg = "QEMU failed; resetting terminal in {d} seconds".format(d=delay) \
+                + "--interrupt to abort\n"
+            notice(msg)
+        else:
+            delay = 2  # in seconds
 
-    time.sleep(delay)
+        time.sleep(delay)
 
-    subprocess.call("tput reset", shell=True)
+        subprocess.call("tput reset", shell=True)
