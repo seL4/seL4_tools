@@ -56,11 +56,6 @@ function(check_arch_clang)
     else()
         message(SEND_ERROR "KernelSel4Arch is not set to a valid arch")
     endif()
-
-    if(NOT correct_triple)
-        message(SEND_ERROR "Clang Triple: ${TRIPLE} isn't for seL4_arch: ${KernelSel4Arch}")
-    endif()
-
 endfunction()
 
 function(check_arch_gcc)
@@ -101,7 +96,7 @@ function(check_arch_gcc)
 endfunction()
 
 function(check_arch_compiler)
-    if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         check_arch_clang()
     else()
         check_arch_gcc()
