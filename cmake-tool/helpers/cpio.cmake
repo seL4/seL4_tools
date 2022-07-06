@@ -52,7 +52,7 @@ function(MakeCPIO output_name input_files)
     CheckCPIOArgument(cpio_reproducible_flag "--reproducible")
     set(
         cpio_cmd
-        "cpio ${cpio_reproducible_flag} --quiet --create -H newc --file=${CMAKE_CURRENT_BINARY_DIR}/${cpio_archive}"
+        "cpio ${cpio_reproducible_flag} --quiet --create --format=newc --file=${CMAKE_CURRENT_BINARY_DIR}/${cpio_archive}"
     )
 
     set(tmp_dir "temp_${output_name}")
