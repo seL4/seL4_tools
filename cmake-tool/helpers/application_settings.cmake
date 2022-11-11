@@ -1,6 +1,7 @@
 #
 # Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
 # Copyright 2020, HENSOLDT Cyber GmbH
+# Copyright 2022, Capgemini Engineering
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -35,9 +36,9 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         set(ElfloaderMode "hypervisor" CACHE STRING "" FORCE)
         set(ElfloaderMonitorHook ON CACHE BOOL "" FORCE)
     endif()
-    if((KernelPlatformImx8mm-evk OR KernelPlatformImx8mq-evk) AND KernelSel4ArchAarch32)
+    if((KernelPlatformImx8mm-evk OR KernelPlatImx8mq) AND KernelSel4ArchAarch32)
         set(ElfloaderArmV8LeaveAarch64 ON CACHE BOOL "" FORCE)
-        # This applies to imx8mm and imx8mq when in aarch32 configuration
+        # This applies to imx8mm, imx8mq (EVK and MaaXBoard) when in aarch32 configuration
         # It should be possible to use a uimage format but when tried nothing
         # runs after uboot.
         set(IMAGE_START_ADDR 0x41000000 CACHE INTERNAL "" FORCE)
@@ -161,6 +162,7 @@ function(correct_platform_strings)
         "bcm2711:rpi4"
         "exynos5:exynos5250,exynos5410,exynos5422"
         "am335x:am335x-boneblack,am335x-boneblue,am335x-bone"
+        "zynqmp:zcu102,ultra96,ultra96v2"
         "-KernelSel4Arch"
         "pc99:x86_64,ia32"
     )
