@@ -8,8 +8,8 @@ cmake_minimum_required(VERSION 3.7.2)
 
 project(elfloader C ASM)
 
-if(KernelArchX86)
-    # This project is only used on Arm or RISC-V
+if(KernelArchX86) 
+    # This project is only used on Arm or RISC-V OR KernelArchLoongarch
     return()
 endif()
 
@@ -26,7 +26,7 @@ config_choice(
     ElfloaderImage
     ELFLOADER_IMAGE
     "Boot image type"
-    "elf;ElfloaderImageELF;IMAGE_ELF;KernelArchARM OR KernelArchRiscV"
+    "elf;ElfloaderImageELF;IMAGE_ELF;KernelArchARM OR KernelArchRiscV OR KernelArchLoongarch"
     "binary;ElfloaderImageBinary;IMAGE_BINARY;KernelArchARM OR KernelArchRiscV"
     "efi;ElfloaderImageEFI;IMAGE_EFI;KernelArchARM"
     "uimage;ElfloaderImageUimage;IMAGE_UIMAGE;KernelArchARM"
@@ -77,7 +77,7 @@ config_option(
     ElfloaderIncludeDtb ELFLOADER_INCLUDE_DTB
     "Include DTB in the CPIO in case bootloader doesn't provide one"
     DEFAULT ON
-    DEPENDS "KernelArchARM OR KernelArchRiscV"
+    DEPENDS "KernelArchARM OR KernelArchRiscV OR KernelArchLoongarch"
     DEFAULT_DISABLED OFF
 )
 
@@ -99,9 +99,11 @@ add_config_library(elfloader "${configure_string}")
 
 add_compile_options(-D_XOPEN_SOURCE=700 -ffreestanding -Wall -Werror -W -Wextra)
 set(linkerScript "${CMAKE_CURRENT_LIST_DIR}/src/arch-${KernelArch}/linker.lds")
+
 if(KernelArchRiscV)
     add_compile_options(-mcmodel=medany)
 endif()
+
 
 if(ElfloaderArmV8LeaveAarch64)
     # We need to build a aarch64 assembly file during an aarch32 build. We have
@@ -234,6 +236,7 @@ list(SORT files)
 
 set(cpio_files "")
 list(APPEND cpio_files "$<TARGET_FILE:kernel.elf>")
+
 if(ElfloaderIncludeDtb)
     list(APPEND cpio_files "${KernelDTBPath}")
 endif()
@@ -267,7 +270,6 @@ endif()
 
 # Construct the ELF loader's payload.
 MakeCPIO(archive.o "${cpio_files}" CPIO_SYMBOL _archive_start)
-
 set(PLATFORM_HEADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/gen_headers")
 set(PLATFORM_INFO_H "${PLATFORM_HEADER_DIR}/platform_info.h")
 set(IMAGE_START_ADDR_H "${PLATFORM_HEADER_DIR}/image_start_addr.h")
@@ -289,7 +291,6 @@ elseif(NOT DEFINED platform_yaml)
     message(FATAL_ERROR "IMAGE_START_ADDR not set and 'platform_yaml' undefined")
 
 else()
-
     # The following does two things. These commands are put together as for some weird
     # reason, CMake does not execute the first command if it's by itself. This could be
     # due to the CMakeLists.txt file in the capDL repository also invoking a similar command
@@ -324,9 +325,7 @@ else()
             "${ELF_SIFT}"
             "${SHOEHORN}"
     )
-
 endif()
-
 if(DEFINED KernelDTBPath)
     get_filename_component(KernelTools ${HARDWARE_GEN_PATH} DIRECTORY)
     set(config_file "${KernelTools}/hardware.yml")
@@ -347,7 +346,6 @@ if(DEFINED KernelDTBPath)
     )
     set_property(SOURCE src/drivers/driver.c PROPERTY OBJECT_DEPENDS ${DEVICES_GEN_H})
 endif()
-
 # Generate linker script
 separate_arguments(c_arguments NATIVE_COMMAND "${CMAKE_C_FLAGS}")
 # Add extra compilation flags required for clang

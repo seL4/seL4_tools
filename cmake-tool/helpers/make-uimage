@@ -119,6 +119,7 @@ trap cleanup HUP INT QUIT TERM EXIT
 # first and reintroduce the race that mktemp avoids.
 "$OBJCOPY" -O binary "$ELF_FILE" /dev/stdout >> $TEMPFILE
 START=$(get_start_symbol "$ELF_FILE")
+
 mkimage -A $ARCHITECTURE -O linux -T kernel -C none \
     -a $START -e $START -d $TEMPFILE "$OUTPUT"
 

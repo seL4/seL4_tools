@@ -6,3 +6,6 @@
 
 # Generated python bytecode
 **/*.pyc
+
+# backup
+*.backup
