@@ -384,9 +384,7 @@ int load_images(
     struct image_info *user_info,
     unsigned int max_user_images,
     unsigned int *num_images,
-    void const *bootloader_dtb,
-    void const **chosen_dtb,
-    size_t *chosen_dtb_size)
+    dtb_info_t *dtb_info)
 {
     int ret;
     uint64_t kernel_phys_start, kernel_phys_end;
@@ -434,31 +432,32 @@ int load_images(
 
 #ifdef CONFIG_ELFLOADER_INCLUDE_DTB
 
-    if (chosen_dtb) {
-        printf("Looking for DTB in CPIO archive...");
-        /*
-         * Note the lack of newline in the above printf().  Normally one would
-         * have an fflush(stdout) here to ensure that the message shows up on a
-         * line-buffered stream (which is the POSIX default on terminal
-         * devices).  But we are freestanding (on the "bare metal"), and using
-         * our own unbuffered printf() implementation.
-         */
-        dtb = cpio_get_file(cpio, cpio_len, "kernel.dtb", NULL);
-        if (dtb == NULL) {
-            printf("not found.\n");
-        } else {
-            has_dtb_cpio = 1;
-            printf("found at %p.\n", dtb);
-        }
+    printf("Looking for DTB in CPIO archive...");
+    /*
+     * Note the lack of newline in the above printf().  Normally one would
+     * have an fflush(stdout) here to ensure that the message shows up on a
+     * line-buffered stream (which is the POSIX default on terminal
+     * devices).  But we are freestanding (on the "bare metal"), and using
+     * our own unbuffered printf() implementation.
+     */
+    dtb = cpio_get_file(cpio, cpio_len, "kernel.dtb", NULL);
+    if (dtb == NULL) {
+        printf("not found.\n");
+    } else {
+        has_dtb_cpio = 1;
+        printf("found at %p.\n", dtb);
     }
 
 #endif /* CONFIG_ELFLOADER_INCLUDE_DTB */
 
-    if (chosen_dtb && !dtb && bootloader_dtb) {
-        /* Use the bootloader's DTB if we are not using the DTB in the CPIO
-         * archive.
-         */
-        dtb = bootloader_dtb;
+    /* If we don't have a DTB here, use the one a bootloader might have
+     * provided. Since 0 is a valid physical address, the size field is used to
+     * determin if the address is valid. A size of -1 indicates, that the actual
+     * size is not known - which is usually the case, because a bootloader often
+     * just passes an address.
+     */
+    if (!dtb && (dtb_info->size > 0)) {
+        dtb = (void const *)dtb_info->phys_base;
     }
 
     /*
@@ -489,9 +488,11 @@ int load_images(
 
         printf("Loaded DTB from %p.\n", dtb);
         printf("   paddr=[%p..%p]\n", dtb_phys_start, dtb_phys_end - 1);
-        *chosen_dtb = (void *)dtb_phys_start;
-        *chosen_dtb_size = dtb_size;
+        dtb_info->phys_base = dtb_phys_start;
+        dtb_info->size = dtb_size;
     } else {
+        dtb_info->phys_base = 0;
+        dtb_info->size = 0;
         next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
     }
 
