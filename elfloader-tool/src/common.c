@@ -127,7 +127,7 @@ static int unpack_elf_to_paddr(
     }
 
     /* Zero out all memory in the region, as the ELF file may be sparse. */
-    memset((void *)dest_paddr, 0, image_size);
+    memset((void *)(dest_paddr | 0x9000000000000000), 0, image_size);
 
     /* Load each segment in the ELF file. */
     for (unsigned int i = 0; i < elf_getNumProgramHeaders(elf); i++) {
@@ -160,7 +160,7 @@ static int unpack_elf_to_paddr(
         }
 
         /* Load data into memory. */
-        memcpy((void *)seg_dest_paddr, seg_src_addr, seg_size);
+        memcpy((void *)(seg_dest_paddr | 0x9000000000000000), seg_src_addr, seg_size);
     }
 
     return 0;
@@ -338,9 +338,9 @@ static int load_elf(
          * memcpy to a bunch of magic offsets. Explicit numbers for sizes
          * and offsets are used so that it is clear exactly what the layout
          * is */
-        memcpy((void *)dest_paddr, &phnum, 4);
-        memcpy((void *)(dest_paddr + 4), &phsize, 4);
-        memcpy((void *)(dest_paddr + 8), (void *)source_paddr, phsize * phnum);
+        memcpy((void *)(dest_paddr | 0x9000000000000000), &phnum, 4);
+        memcpy((void *)((dest_paddr + 4) | 0x9000000000000000), &phsize, 4);
+        memcpy((void *)((dest_paddr + 8) | 0x9000000000000000), (void *)source_paddr, phsize * phnum);
         /* return the frame after our headers */
         dest_paddr += KEEP_HEADERS_SIZE;
     }
@@ -461,6 +461,7 @@ int load_images(
         dtb = bootloader_dtb;
     }
 
+    *chosen_dtb_size = 0;
     /*
      * Move the DTB out of the way, if it's present.
      */
@@ -482,7 +483,7 @@ int load_images(
             return -1;
         }
 
-        memmove((void *)next_phys_addr, dtb, dtb_size);
+        memmove((void *)(next_phys_addr | 0x9000000000000000), dtb, dtb_size);
         next_phys_addr += dtb_size;
         next_phys_addr = ROUND_UP(next_phys_addr, PAGE_BITS);
         dtb_phys_end = next_phys_addr;
@@ -571,6 +572,8 @@ int load_images(
                      - ROUND_UP(total_user_image_size, PAGE_BITS);
 
 #endif /* CONFIG_ELFLOADER_ROOTSERVERS_LAST */
+
+    // next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
 
     *num_images = 0;
     for (unsigned int i = 0; i < max_user_images; i++) {

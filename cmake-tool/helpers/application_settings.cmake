@@ -53,6 +53,9 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
     if(KernelPlatformSpike AND KernelSel4ArchRiscV32)
         set(IMAGE_START_ADDR 0x80400000 CACHE INTERNAL "" FORCE)
     endif()
+    if(KernelPlatform3A5000 AND KernelSel4ArchLoongarch64)
+       set(IMAGE_START_ADDR 0x9000000002000000 CACHE INTERNAL "" FORCE) #32MB alignment
+    endif()
 endfunction()
 
 function(ApplyCommonSimulationSettings kernel_sel4_arch)
@@ -101,6 +104,7 @@ endfunction()
 #  - aarch64: AARCH64
 #  - riscv64: RISCV64
 #  - riscv32: RISCV32
+#  - loongarch64: loongarch64
 #
 # Calling this function will result in forced updates to the cache.
 function(correct_platform_strings)
@@ -134,6 +138,9 @@ function(correct_platform_strings)
     elseif(KernelRiscVSel4Arch)
         # this should not have been in use at all
         message(FATAL_ERROR "KernelRiscVSel4Arch is no longer supported, use PLATFROM")
+    elseif(KernelLoongarchSel4Arch)
+        # this should not have been in use at all
+        message(FATAL_ERROR "KernelLoongarchSel4Arch is no longer supported, use PLATFROM")
     endif()
 
     set(
@@ -166,13 +173,13 @@ function(correct_platform_strings)
         "-KernelSel4Arch"
         "pc99:x86_64,ia32"
     )
-
+    # "-KernelLoongarchPlatform"
+    # "loongson3A:3A5000"
     set(all_boards "")
     set(block_kernel_var "")
     set(kernel_var "")
 
     foreach(item IN LISTS platform_aliases)
-
         if(item MATCHES "^-(.*)$")
             set(block_kernel_var "${CMAKE_MATCH_1}")
             continue()
@@ -224,7 +231,6 @@ function(correct_platform_strings)
         set(${kernel_var} "${PLATFORM}" CACHE STRING "" FORCE)
 
     endforeach()
-
     if(NOT kernel_var)
         set(KernelPlatform "${PLATFORM}" CACHE STRING "" FORCE)
     endif()
@@ -263,6 +269,8 @@ function(correct_platform_strings)
         set(KernelSel4Arch "riscv64" CACHE STRING "" FORCE)
     elseif(RISCV32)
         set(KernelSel4Arch "riscv32" CACHE STRING "" FORCE)
+    elseif(Loongarch64)
+        set(KernelSel4Arch "loongarch64" CACHE STRING "" FORCE)
     else()
         set(_REWRITE OFF)
     endif()

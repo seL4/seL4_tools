@@ -10,7 +10,7 @@ include_guard(GLOBAL)
 macro(add_default_compilation_options)
     # Setup base flags as defined by the kernel before including the rest
     include(${KERNEL_FLAGS_PATH})
-
+    
     if(("${CMAKE_BUILD_TYPE}" STREQUAL "Release") OR ("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel"))
         option(UserLinkerGCSections "Perform dead code and data removal
             Build user level with -ffunction-sections and -fdata-sections and
@@ -26,7 +26,6 @@ macro(add_default_compilation_options)
         endif()
     endif()
     mark_as_advanced(UserLinkerGCSections)
-
     add_compile_options(
         -nostdinc
         -fno-pic
@@ -43,7 +42,7 @@ macro(add_default_compilation_options)
         CMAKE_EXE_LINKER_FLAGS
         "${CMAKE_EXE_LINKER_FLAGS} -static -nostdlib -z max-page-size=${LinkPageSize}"
     )
-
+    
     if(KernelArchX86)
         add_compile_options(-mtls-direct-seg-refs)
     endif()

@@ -12,9 +12,14 @@
 typedef uintptr_t paddr_t;
 typedef uintptr_t vaddr_t;
 
+#ifdef CONFIG_ARCH_LOONGARCH
+#define PAGE_BITS           14
+#define BIT(x)              (1UL<<(x))
+#else
 #define PAGE_BITS           12
-
 #define BIT(x)              (1 << (x))
+#endif
+
 #define MASK(n)             (BIT(n) - 1)
 #define MIN(a, b)           (((a) < (b)) ? (a) : (b))
 #define IS_ALIGNED(n, b)    (!((n) & MASK(b)))

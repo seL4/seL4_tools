@@ -50,6 +50,7 @@ function(MakeCPIO output_name input_files)
         "bash;-c;cpio ${cpio_reproducible_flag} --quiet --create -H newc --file=${CMAKE_CURRENT_BINARY_DIR}/archive.${output_name}.cpio;&&"
     )
     foreach(file IN LISTS input_files)
+        
         # Try and generate reproducible cpio meta-data as we do this:
         # - touch -d @0 file sets the modified time to 0
         # - --owner=root:root sets user and group values to 0:0
@@ -65,7 +66,6 @@ function(MakeCPIO output_name input_files)
     if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
         list(APPEND cmake_c_flags_sep "${CMAKE_C_COMPILE_OPTIONS_TARGET}${CMAKE_C_COMPILER_TARGET}")
     endif()
-
     add_custom_command(
         OUTPUT ${output_name}
         COMMAND rm -f archive.${output_name}.cpio
