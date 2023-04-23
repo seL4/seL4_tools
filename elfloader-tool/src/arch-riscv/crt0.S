@@ -58,10 +58,24 @@ _start:
   /* Attach the stack to sp before calling any C functions */
   la sp, (elfloader_stack_alloc + BIT(12))
 
-#ifdef CONFIG_IMAGE_BINARY
+  /*
+   * Binary images may not be loaded in the correct location.
+   * Try and move ourselves so we're in the right place.
+   */
+  mv a0, a1 /* Pass dtb as first argument */
+  jal fixup_image_base
+  /* fixup_image_base returns 0 if no need to move */
+  beqz     a0, 1f
+
+  /* otherwise, restore args and jump to the start of the new elfloader */
+  mv a2, a0
+  mv a0, s0
+  mv a1, s2
+  jr a2
+
 /* Clear the BSS before we get to do anything more specific */
+1:
   jal clear_bss
-#endif
 
   /* Check if the Heart State Management (HSM) extension exists, so it can be
    * used to switch harts if we are not running on hart CONFIG_FIRST_HART_ID.

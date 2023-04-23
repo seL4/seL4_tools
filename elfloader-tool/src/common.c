@@ -29,8 +29,13 @@
 #include <platform_info.h> // this provides memory_region
 #endif
 
+#include <image_start_addr.h>
+#include <abort.h>
+
 extern char _bss[];
 extern char _bss_end[];
+extern char _start[];
+extern char _end[];
 
 /*
  * Clear the BSS segment
@@ -617,4 +622,68 @@ int load_images(
 WEAK void platform_init(void)
 {
     /* nothing by default */
+}
+
+#ifdef CONFIG_ARCH_ARM
+extern void flush_dcache(void);
+extern void invalidate_icache(void);
+#endif
+
+/*
+ * Moves the elfloader to its expected start address in memory.
+ * This is for when the elfloader needs to be in a specific location
+ * to ensure that it doesn't occupy memory that it needs to load the
+ * kernel and user applications into.
+ */
+char *fixup_image_base(char const *fdt)
+{
+    char *load_base = _start;
+    char *target_base = (char *) IMAGE_START_ADDR;
+    if (load_base == target_base) {
+        /* already in the right place, just keep booting */
+        return (char *)0;
+    }
+
+    /* Check that the current image location doesn't overlap with the
+     * destination location. */
+    size_t image_size = _end - _start;
+    size_t code_size = _archive_start - _start;
+    char *target_end = target_base + image_size;
+    if (image_size < code_size) {
+        /* This shouldn't happen as image size must be greater than
+         * code size. This allows the region check below to only consider
+         * if the smaller region is inside the larger region. */
+        abort();
+    }
+    if ((_start >= target_base && _start < target_end) ||
+        (_archive_start >= target_base && _archive_start < target_end)) {
+        abort();
+    }
+
+    /* If a fdt was passed in from the previous boot stage, also
+     * check that it isn't overwritten.
+     */
+    if (fdt) {
+        size_t dtb_size = fdt_size(fdt);
+        const char *fdt_end = fdt + dtb_size;
+        if (image_size < dtb_size) {
+            /* Assume the dtb is smaller than the images size to
+             * simplify region check */
+            abort();
+        }
+        if ((fdt >= target_base && fdt < target_end) ||
+            (fdt_end >= target_base && fdt_end < target_end)) {
+            abort();
+        }
+    }
+
+
+    /* Perform the move and clean/invalidate caches if necessary */
+    char *ret = memmove(target_base, load_base, image_size);
+#ifdef CONFIG_ARCH_ARM
+    flush_dcache();
+    invalidate_icache();
+#endif
+    return ret;
+
 }
