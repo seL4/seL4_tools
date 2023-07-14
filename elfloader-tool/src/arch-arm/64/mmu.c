@@ -11,6 +11,7 @@
 #include <mode/structures.h>
 #include <printf.h>
 #include <abort.h>
+#include <mode/aarch64.h>
 #include <armv/machine.h>
 
 /*
@@ -31,7 +32,7 @@ void init_boot_vspace(struct image_info *kernel_info)
     for (i = 0; i < BIT(PUD_BITS); i++) {
         _boot_pud_down[i] = (i << ARM_1GB_BLOCK_BITS)
                             | BIT(10) /* access flag */
-                            | (0 << 2) /* strongly ordered memory */
+                            | (MT_DEVICE_nGnRnE << 2) /* strongly ordered memory */
                             | BIT(0); /* 1G block */
     }
 
@@ -52,7 +53,7 @@ void init_boot_vspace(struct image_info *kernel_info)
 #if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8) /* make sure the shareability is the same as the kernel's */
 #endif
-                          | (4 << 2) /* MT_NORMAL memory */
+                          | (MT_NORMAL << 2) /* MT_NORMAL memory */
                           | BIT(0); /* 2M block */
         first_paddr += BIT(ARM_2MB_BLOCK_BITS);
     }
@@ -74,7 +75,7 @@ void init_hyp_boot_vspace(struct image_info *kernel_info)
     for (i = 0; i < BIT(PUD_BITS); i++) {
         _boot_pud_down[i] = (i << ARM_1GB_BLOCK_BITS)
                             | BIT(10) /* access flag */
-                            | (0 << 2) /* strongly ordered memory */
+                            | (MT_DEVICE_nGnRnE << 2) /* strongly ordered memory */
                             | BIT(0); /* 1G block */
     }
 
@@ -91,7 +92,7 @@ void init_hyp_boot_vspace(struct image_info *kernel_info)
 #if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8)
 #endif
-                          | (4 << 2) /* MT_NORMAL memory */
+                          | (MT_NORMAL << 2) /* MT_NORMAL memory */
                           | BIT(0); /* 2M block */
     }
 }
