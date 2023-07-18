@@ -22,8 +22,13 @@
 /* 0xd00dfeed in big endian */
 #define DTB_MAGIC (0xedfe0dd0)
 
-/* Maximum alignment we need to preserve when relocating (64K) */
-#define MAX_ALIGN_BITS (14)
+/* Maximum alignment we need to preserve when relocating (64K)
+ *
+ * The 64 kiB alignment is a maximum requirement for a stage2
+ * concatenated pagetable. See Table G5-4 in ARM DDI 0487I.a, page
+ * G5-9186.
+ */
+#define MAX_ALIGN_BITS (16)
 
 #ifdef CONFIG_IMAGE_EFI
 ALIGN(BIT(PAGE_BITS)) VISIBLE
