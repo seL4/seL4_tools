@@ -23,7 +23,7 @@
 #define DTB_MAGIC (0xedfe0dd0)
 
 /* Maximum alignment we need to preserve when relocating (64K) */
-#define MAX_ALIGN_BITS (14)
+#define MAX_ALIGN_BITS (16)
 
 #ifdef CONFIG_IMAGE_EFI
 ALIGN(BIT(PAGE_BITS)) VISIBLE
