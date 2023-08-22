@@ -24,7 +24,7 @@ static volatile int non_boot_lock = 0;
 void arm_disable_dcaches(void);
 
 extern void const *dtb;
-extern uint32_t dtb_size;
+extern size_t dtb_size;
 
 /* Entry point for all CPUs other than the initial. */
 void non_boot_main(void)
@@ -69,10 +69,10 @@ void non_boot_main(void)
         arm_enable_mmu();
     }
 
-    /* Jump to the kernel. */
+    /* Jump to the kernel. Note: Our DTB is smaller than 4 GiB. */
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end, user_info.phys_virt_offset,
-                                                user_info.virt_entry, (paddr_t)dtb, dtb_size);
+                                                user_info.virt_entry, (paddr_t)dtb, (uint32_t)dtb_size);
 
     printf("AP Kernel returned back to the elf-loader.\n");
     abort();
