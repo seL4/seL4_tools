@@ -221,17 +221,18 @@ void continue_boot(int was_relocated)
         arm_enable_mmu();
     }
 
-    /* Enter kernel. The UART may no longer be accessible here. */
+    /* The UART may no longer be accessible here. */
     if ((uintptr_t)uart_get_mmio() < kernel_info.virt_region_start) {
         printf("Jumping to kernel-image entry point...\n\n");
     }
 
+    /* Jump to the kernel. Note: Our DTB is smaller than 4 GiB. */
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end,
                                                 user_info.phys_virt_offset,
                                                 user_info.virt_entry,
                                                 (word_t)dtb,
-                                                dtb_size);
+                                                (uint32_t)dtb_size);
 
     /* We should never get here. */
     printf("ERROR: Kernel returned back to the ELF Loader\n");
