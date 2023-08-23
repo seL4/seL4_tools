@@ -51,20 +51,17 @@ void non_boot_main(void)
 
     if (is_hyp_mode()) {
         extern void leave_hyp(void);
-        extern void disable_mmu_caches_hyp(void);
-#ifdef CONFIG_ARCH_AARCH64
-        /* Disable the MMU and cacheability unconditionally on ARM64.
-         * The 32 bit ARM platforms do not expect the MMU to be turned
-         * off, so we leave them alone. */
-        disable_mmu_caches_hyp();
-#endif
 #ifndef CONFIG_ARM_HYPERVISOR_SUPPORT
         leave_hyp();
 #endif
     }
     /* Enable the MMU, and enter the kernel. */
     if (is_hyp_mode()) {
+#if defined(CONFIG_ARCH_AARCH64)
+        arm_switch_to_hyp_tables();
+#else
         arm_enable_hyp_mmu();
+#endif
     } else {
         arm_enable_mmu();
     }

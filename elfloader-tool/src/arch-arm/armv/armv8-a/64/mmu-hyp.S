@@ -21,12 +21,6 @@
 .extern invalidate_icache
 .extern _boot_pgd_down
 
-BEGIN_FUNC(disable_mmu_caches_hyp)
-    /* Assume D-cache already cleaned to PoC */
-    disable_mmu sctlr_el2, x9
-    ret
-END_FUNC(disable_mmu_caches_hyp)
-
 BEGIN_FUNC(clean_dcache_by_range)
     /* Ordering needed for strongly-ordered mem, not needed for NORMAL mem.
      * See ARM DDI 0487I.a, page D7-5063.
@@ -76,7 +70,10 @@ BEGIN_FUNC(leave_hyp)
     eret
 END_FUNC(leave_hyp)
 
-BEGIN_FUNC(arm_enable_hyp_mmu)
+BEGIN_FUNC(arm_switch_to_hyp_tables)
+    /* Load MAIR & TCR values; construct TTBR address before disabling and re-
+     * enabling the MMU & caches.
+     */
     /*
      *   DEVICE_nGnRnE      000     00000000
      *   DEVICE_nGnRE       001     00000100
@@ -91,16 +88,28 @@ BEGIN_FUNC(arm_enable_hyp_mmu)
                  MAIR(0x44, MT_NORMAL_NC) | \
                  MAIR(0xff, MT_NORMAL) | \
                  MAIR(0xaa, MT_NORMAL_WT)
-    msr     mair_el2, x5
+
     ldr     x8, =TCR_T0SZ(48) | TCR_IRGN0_WBWC | TCR_ORGN0_WBWC | TCR_SH0_ISH | TCR_TG0_4K | TCR_PS | TCR_EL2_RES1
+
+    /* Use x16 as temp register */
+    disable_mmu  sctlr_el2, x16
+
+    msr     mair_el2, x5
     msr     tcr_el2, x8
     isb
 
+    /* For non-VHE the "down" contains both the the kernel mapping and 1:1 mapping. */
     adrp    x8, _boot_pgd_down
     msr     ttbr0_el2, x8
     isb
 
+     /* Invalidate TLBs */
+    dsb     sy
     tlbi    alle2is
+    tlbi    vmalls12e1
+    dsb     sy
+
+    tlbi    vmalle1is
     dsb     ish
     isb
 
@@ -113,4 +122,4 @@ BEGIN_FUNC(arm_enable_hyp_mmu)
     /* NOTE: enable_mmu already contains an isb after enabling. */
 
     ret
-END_FUNC(arm_enable_hyp_mmu)
+END_FUNC(arm_switch_to_hyp_tables)
