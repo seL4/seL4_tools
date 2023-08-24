@@ -4,11 +4,20 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 
+#include <autoconf.h>
 #include <binaries/efi/efi.h>
 #include <elfloader_common.h>
 
 void *__application_handle = NULL;             // current efi application handler
 efi_system_table_t *__efi_system_table = NULL; // current efi system table
+
+static unsigned long efi_exit_bs_result = EFI_SUCCESS;
+static unsigned long exit_boot_services(void);
+
+unsigned long efi_exit_boot_services(void)
+{
+    return efi_exit_bs_result;
+}
 
 extern void _start(void);
 unsigned int efi_main(uintptr_t application_handle, uintptr_t efi_system_table)
@@ -16,6 +25,7 @@ unsigned int efi_main(uintptr_t application_handle, uintptr_t efi_system_table)
     clear_bss();
     __application_handle = (void *)application_handle;
     __efi_system_table = (efi_system_table_t *)efi_system_table;
+    efi_exit_bs_result = exit_boot_services();
     _start();
     return 0;
 }
@@ -41,7 +51,7 @@ void *efi_get_fdt(void)
  * This means boot time services are not available anymore. We should store
  * system information e.g. current memory map and pass them to kernel.
  */
-unsigned long efi_exit_boot_services(void)
+static unsigned long exit_boot_services(void)
 {
     unsigned long status;
     efi_memory_desc_t *memory_map;
@@ -78,5 +88,11 @@ again:
     }
 
     status = bts->exit_boot_services(__application_handle, key);
+
+#if defined(CONFIG_ARCH_AARCH64)
+    /* Now that we're free, mask all exceptions until we enter the kernel */
+    asm volatile("msr daifset, #0xF\n\t");
+#endif
+
     return status;
 }
