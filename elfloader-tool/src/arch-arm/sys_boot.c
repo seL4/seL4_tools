@@ -226,6 +226,11 @@ void continue_boot(int was_relocated)
         printf("Jumping to kernel-image entry point...\n\n");
     }
 
+#if defined(CONFIG_ARCH_AARCH64)
+    /* Clear D&A in DAIF */
+    asm volatile("msr daifclr, #0xC\n\t");
+#endif
+
     /* Jump to the kernel. Note: Our DTB is smaller than 4 GiB. */
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end,
