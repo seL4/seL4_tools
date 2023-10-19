@@ -51,7 +51,7 @@
 #define PTE_GSRWXV 0x11D3
 
 #define PTE_CREATE_NEXT(PT_BASE) (unsigned long)PT_BASE
-#define PTE_CREATE_64GHUGE_LEAF(PT_BASE) (unsigned long)(PTE_64GHUGE_PA(PT_BASE)|PTE_GSRWXV)
+#define PTE_CREATE_64GHUGE_LEAF(PT_BASE) (unsigned long)(PTE_64GHUGE_PA(PT_BASE) | PTE_GSRWXV)
 #define PTE_CREATE_HUGE_LEAF(PT_BASE) (unsigned long)(PTE_HUGE_PA(PT_BASE) | PTE_GSRWXV)
 
 #define GET_PT_INDEX(addr, n) (((addr) >> (((PT_INDEX_BITS) * ((PT_LEVELS) - (n))) + LOONGARCH_L3PGSHIFT)) % PTES_PER_PT)
@@ -117,7 +117,7 @@ static void setup_pw(void)
 
 static inline void invtlb(void)
 {
-    asm volatile("invtlb 0x1, $r0, $r0" :::);
+    asm volatile("invtlb 0x0, $r0, $r0" :::);
 }
 
 static inline void dbar(void)
@@ -148,7 +148,7 @@ static void init_tlb(void)
         printf("MMU doesn't support PAGE_SIZE\n");
 
     setup_tlb_handler();
-    // invtlb();
+    invtlb();
 }
 
 static int map_kernel_window(struct image_info *kernel_info)
