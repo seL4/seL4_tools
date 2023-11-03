@@ -67,7 +67,15 @@
 #define MT_NORMAL_WT      5
 #define MAIR(_attr, _mt)  ((_attr) << ((_mt) * 8))
 
+.macro disable_mmu sctlr tmp
+    __disable_mmu \sctlr, \tmp
+    ic      ialluis
+    dsb     sy
+    isb
+.endm
+
 .macro enable_mmu sctlr tmp
+    dsb     sy
     mrs     \tmp, \sctlr
     orr     \tmp, \tmp, #(1 << 0)
     orr     \tmp, \tmp, #(1 << 2)
@@ -76,17 +84,11 @@
     isb
 .endm
 
-.macro disable_mmu sctlr tmp
+.macro __disable_mmu sctlr tmp
+    dsb     sy
+    isb
     mrs     \tmp, \sctlr
     bic     \tmp, \tmp, #(1 << 0)
-    bic     \tmp, \tmp, #(1 << 2)
-    bic     \tmp, \tmp, #(1 << 12)
-    msr     \sctlr, \tmp
-    isb
-.endm
-
-.macro disable_id_cache sctlr tmp
-    mrs     \tmp, \sctlr
     bic     \tmp, \tmp, #(1 << 2)
     bic     \tmp, \tmp, #(1 << 12)
     msr     \sctlr, \tmp

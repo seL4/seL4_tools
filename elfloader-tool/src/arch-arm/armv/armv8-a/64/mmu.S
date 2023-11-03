@@ -43,17 +43,6 @@ BEGIN_FUNC(arm_enable_mmu)
     stp     x29, x30, [sp, #-16]!
     mov     x29, sp
 
-    bl      flush_dcache
-
-    /* Ensure I-cache, D-cache and mmu are disabled for EL1/Stage1 */
-    disable_mmu sctlr_el1 , x8
-
-    /*
-     * Invalidate the local I-cache so that any instructions fetched
-     * speculatively are discarded.
-     */
-    bl      invalidate_icache
-
     /*
      *   DEVICE_nGnRnE      000     00000000
      *   DEVICE_nGnRE       001     00000100
