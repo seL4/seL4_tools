@@ -53,10 +53,6 @@ clean_dcache_by_range_loop:
 END_FUNC(clean_dcache_by_range)
 
 BEGIN_FUNC(leave_hyp)
-    /* We call nested functions, follow the ABI. */
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-
     /* Ensure I-cache, D-cache and mmu are disabled for EL1/Stage2 */
     mov     x9, #(1 << 31)
     msr     hcr_el2, x9
@@ -74,7 +70,6 @@ BEGIN_FUNC(leave_hyp)
     msr     spsr_el2, x9
 
     /* Let's the caller use our stack, in case it needs to pop something */
-    ldp     x29, x30, [sp], #16
     mov     x10, sp
     msr     sp_el1, x10
     msr     elr_el2, x30
