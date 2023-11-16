@@ -34,7 +34,11 @@ void non_boot_main(void)
 #endif
     /* Spin until the first CPU has finished initialisation. */
     while (!non_boot_lock) {
-#ifndef CONFIG_ARCH_AARCH64
+#ifdef CONFIG_ARCH_AARCH64
+        /* The compiler may optimize this loop away, add a dsb()
+         * to force a reload. */
+        dsb();
+#else
         cpu_idle();
 #endif
     }
@@ -124,7 +128,13 @@ WEAK void init_cpus(void)
             abort();
         }
 
-        while (!is_core_up(num_cpus));
+        while (!is_core_up(num_cpus)) {
+#if defined(CONFIG_ARCH_AARCH64)
+            /* The compiler may optimize this loop away, add a dsb()
+             * to force a reload. */
+            dsb();
+#endif
+        }
         printf("Core %d is up with logic id %d\n", elfloader_cpus[i].cpu_id, num_cpus);
         num_cpus++;
     }
@@ -141,6 +151,13 @@ void smp_boot(void)
     arm_disable_dcaches();
 #endif
     init_cpus();
+#if defined(CONFIG_ARCH_AARCH64)
+    dsb();
     non_boot_lock = 1;
+    /* Secondary CPUs may still run with MMU & caches off. Force the update to be visible. */
+    asm volatile("dc civac, %0\n\t" :: "r"(&non_boot_lock) : "memory");;
+#else
+    non_boot_lock = 1;
+#endif
 }
 #endif /* CONFIG_MAX_NUM_NODES */
