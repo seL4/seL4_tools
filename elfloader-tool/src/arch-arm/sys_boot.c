@@ -184,6 +184,13 @@ void continue_boot(int was_relocated)
         initialise_devices();
     }
 
+    /* Setup MMU. */
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT)
+    init_hyp_boot_vspace(&kernel_info);
+#else
+    init_boot_vspace(&kernel_info);
+#endif
+
     /* If in EL2, disable MMU and I/D cacheability unconditionally */
     if (is_hyp_mode()) {
         extern void disable_mmu_caches_hyp(void);
@@ -216,13 +223,6 @@ void continue_boot(int was_relocated)
         /* Switch to EL1, assume EL2 MMU already disabled for ARMv8. */
         leave_hyp();
 #endif
-    /* Setup MMU. */
-    if (is_hyp_mode()) {
-        init_hyp_boot_vspace(&kernel_info);
-    } else {
-        /* If we are not in HYP mode, we enable the SV MMU and paging
-         * just in case the kernel does not support hyp mode. */
-        init_boot_vspace(&kernel_info);
     }
 
 #if CONFIG_MAX_NUM_NODES > 1

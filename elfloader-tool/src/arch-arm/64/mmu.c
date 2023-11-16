@@ -11,6 +11,7 @@
 #include <mode/structures.h>
 #include <printf.h>
 #include <abort.h>
+#include <armv/machine.h>
 
 /*
 * Create a "boot" page table, which contains a 1:1 mapping below
@@ -55,6 +56,11 @@ void init_boot_vspace(struct image_info *kernel_info)
                           | BIT(0); /* 2M block */
         first_paddr += BIT(ARM_2MB_BLOCK_BITS);
     }
+
+    /* Architecturally required barrier to make all writes to pagetable memories
+     * visible to the pagetable walker. See ARM DDI 0487I.a, section D8.2.6.
+     */
+    dsb();
 }
 
 void init_hyp_boot_vspace(struct image_info *kernel_info)
