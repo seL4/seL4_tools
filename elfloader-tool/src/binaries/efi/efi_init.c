@@ -62,30 +62,32 @@ static unsigned long exit_boot_services(void)
     efi_boot_services_t *bts = get_efi_boot_services();
 
     /*
-     * As the number of existing memeory segments are unknown,
+     * As the number of existing memory segments are unknown,
      * we need to resort to a trial and error to guess that.
      * We start from 32 and increase it by one until get a valid value.
      */
     map_size = sizeof(*memory_map) * 32;
 
-again:
-    status = bts->allocate_pool(EFI_LOADER_DATA, map_size, (void **)&memory_map);
+    do {
+        status = bts->allocate_pool(EFI_LOADER_DATA, map_size, (void **)&memory_map);
+        /* If the allocation fails, there is something wrong and we cannot continue */
+        if (status != EFI_SUCCESS) {
+            return status;
+        }
 
-    if (status != EFI_SUCCESS)
-        return status;
+        status = bts->get_memory_map(&map_size, memory_map, &key, &desc_size, &desc_version);
+        if (status != EFI_SUCCESS) {
+            bts->free_pool(memory_map);
+            memory_map = NULL;
 
-    status = bts->get_memory_map(&map_size, memory_map, &key, &desc_size, &desc_version);
-    if (status == EFI_BUFFER_TOO_SMALL) {
-        bts->free_pool(memory_map);
-
-        map_size += sizeof(*memory_map);
-        goto again;
-    }
-
-    if (status != EFI_SUCCESS){
-        bts->free_pool(memory_map);
-        return status;
-    }
+            if (status == EFI_BUFFER_TOO_SMALL) {
+                map_size += sizeof(*memory_map);
+            } else {
+                /* some other error; bail out! */
+                return status;
+            }
+        }
+    } while (status == EFI_BUFFER_TOO_SMALL);
 
     status = bts->exit_boot_services(__application_handle, key);
 
