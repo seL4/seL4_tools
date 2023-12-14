@@ -63,8 +63,8 @@ static unsigned long exit_boot_services(void)
 
     /*
      * As the number of existing memory segments are unknown,
-     * we need to resort to a trial and error to guess that.
-     * We start from 32 and increase it by one until get a valid value.
+     * we need to start somewhere. The API then tells us how much space we need
+     * if it is not enough.
      */
     map_size = sizeof(*memory_map) * 32;
 
@@ -81,7 +81,12 @@ static unsigned long exit_boot_services(void)
             memory_map = NULL;
 
             if (status == EFI_BUFFER_TOO_SMALL) {
-                map_size += sizeof(*memory_map);
+                /* Note: "map_size" is an IN/OUT-parameter and has been updated to the
+                 *       required size. We still add one more entry ("desc_size" is in bytes)
+                 *       due to the hint from the spec ("since allocation of the new buffer
+                 *       may potentially increase memory map size.").
+                 */
+                map_size += desc_size;
             } else {
                 /* some other error; bail out! */
                 return status;
