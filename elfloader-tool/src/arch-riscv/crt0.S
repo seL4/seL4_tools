@@ -10,7 +10,6 @@
 .extern main
 .extern __global_pointer$
 .extern elfloader_stack
-.extern hsm_exists
 #if CONFIG_MAX_NUM_NODES > 1
 .extern secondary_hart_main
 .extern next_logical_core_id
@@ -49,23 +48,20 @@
 .global _start
 _start:
 
+  /* save the parameters passed */
+  mv s0, a0 /* preserve a0 (hart id) in s0 */
+  mv s1, a1 /* preserve a1 (dtb) in s1 */
+
+  /* prepare a minimal C environment with registers gp and sp set up. */
 .option push
 .option norelax
 1:auipc gp, %pcrel_hi(__global_pointer$)
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
-
-  /* save the parameters passed */
-  mv s0, a0 /* preserve a0 (hart id) in s0 */
-  mv s2, a1 /* preserve a1 (dtb) in s2 */
-
-  /* Attach the stack to sp before calling any C functions */
   la sp, (elfloader_stack + BIT(CONFIG_KERNEL_STACK_BITS))
 
-#ifdef CONFIG_IMAGE_BINARY
-/* Clear the BSS before we get to do anything more specific */
+  /* Clear the BSS before we get to do anything more specific */
   jal clear_bss
-#endif
 
   /* Check if the Heart State Management (HSM) extension exists, so it can be
    * used to switch harts if we are not running on hart CONFIG_FIRST_HART_ID.
@@ -77,57 +73,129 @@ _start:
   li a6, SBI_EXT_BASE_PROBE_EXT
   li a0, SBI_HSM_BASE
   ecall /* call SBI to probe for HSM extension */
-  mv a2, a0 /* move SBI call generic return code to a2 as we need a0 */
-  mv a3, a1 /* move SBI call error return code to a3 as we need a1 */
-  mv a0, s0 /* restore a0 to hold hart ID passed by the boot loader */
-  mv a1, s2 /* restore a1 to hold dtb address passed by the boot loader */
-  bnez a2, _start1 /* goto _start1 if SBI did not return SBI_SUCCESS (0) */
-  beqz a3, _start1 /* goto _start1 if HSM extension is missing */
+  seqz t0, a0 /* t0 = (a0 == 0) to check SBI returned SBI_SUCCESS (0)  */
+  snez t1, a1 /* t1 = (a1 != 0) to HSM extension exist */
+  and a2, t0, t1 /* a2 = 1 if HSM extension is available, otherwise 0 */
+  li t0, CONFIG_FIRST_HART_ID
+  bne s0, t0, start_on_secondary
+  mv a0, s0 /* restore a0 to hold hart ID */
+  mv a1, s1 /* restore a1 to hold DTB passed on entry */
+  /* a2 still hold the "HSM extension exists" flag, sp is already set up. Jump
+   * to C code via function address in a register, as this extends the jump
+   * range. Register t1 instead of t0 (x5) is used, because this is a designated
+   * additional link register making jr a call and not a jump then.
+   */
+  la t1, main
+  jr t1
 
-  /* Update global bool variable to tell boot code the HSM extension exists. */
-  la t1, hsm_exists
-  li t2, 1
-  amoadd.w t1, t2, (t1)
-
-  /*  Check if we are on CONFIG_FIRST_HART_ID */
-  li s1, CONFIG_FIRST_HART_ID
-  beq  a0, s1, _start1 /* goto _start1 if we are on CONFIG_FIRST_HART_ID */
-
-  /* Use HSM extension to start hart CONFIG_FIRST_HART_ID. */
-hsm_switch_hart:
+/*----------------------------------------------------------------------------*/
+start_on_secondary:
+  /* We end up here if the startup code has detected that SBI has started us on
+   * a hart that is not the designated primary hart. Try to switch to the
+   * primary hart and continue the boot process there. This must be supported
+   * even if CONFIG_MAX_NUM_NODES is set to 1. The register setup is:
+   *   s0: hard ID
+   *   s1: DTB passed from SBI
+   *   a2: HSM extension exists flag
+   */
+  beqz a2, no_hsm_start_secondary
+  /* Try to bring up the primary hart via the HSM extension */
   li a7, SBI_HSM_BASE
   li a6, SBI_HSM_BASE_HART_START
   li a0, CONFIG_FIRST_HART_ID /* hart id to start */
-  mv a2, s2 /* dtb address to be passed in a1 when new hart starts is 3rd parameter */
-  la a1, _start1 /* where to start the hart */
+  la a1, hsm_entry_on_primary_hart /* where to start the hart */
+  mv a2, s1 /* custom parameter passed in a1 is the DTB */
   ecall /* call SBI to start hart FIRST_HART_ID */
   /* Stop current hart, the boot code may bring it up again when needed. */
-  j hsm_suspend_hart
+hsm_suspend_hart:
+  li a7, SBI_HSM_BASE
+  li a6, SBI_HSM_BASE_HART_STOP
+  ecall /* call SBI to suspend current HART */
+  /* this is not supposed to return. Seem the hart could not be stopped, there
+   * is nothing we can do in this case as SBI seem broken.
+   */
+1:
+  wfi
+  j 1b
 
 /*----------------------------------------------------------------------------*/
-_start1:
-/* This is basically an asm wrapper to jump to the C code at main(). The
- * registers are already set up with the perameters for the C code:
- *   a0 holds current hard ID passed by bootloader
- *   a1 holds dtb address passed by bootloader
- * All that is left to be done here is setting up the registers gp and sp to
- * have a proper C environment. The hart we are running on now could be a
- * different HART to the one that we have been on in _start. The original hart
- * we came from will get a different stack in hsm_entry_on_secondary_hart.
- */
+no_hsm_start_secondary:
+ /* We end up here if we were not started on the designated primary core and SBI
+  * does no implement the HSM extension, so we can't switch to the designated
+  * primary hart. Looks like we are running on a legacy platform where all harts
+  start in parallel. The register setup is:
+  *   s0: hard ID
+  *   s1: DTB passed from SBI
+  *   a2: HSM extension exists flag, set to 0
+  */
+#if CONFIG_MAX_NUM_NODES > 1
+  /* Simulate an SBI HSM extension entry, where a0 holds the hart ID and a1 a
+   * custom value, which is the logical core ID in our usage. Determine it from
+   * an atomic increment operation on the global variable next_logical_core_id,
+   * what we use as our ID is the value it had before incrementing it.
+   */
+  mv a0, s0 /* restore a0 with hart ID */
+  la t0, next_logical_core_id
+  li t1, 1
+  amoadd.w a1, t1, (t0) /* a1 is set to old value of next_logical_core_id */
+  /* The logic core must be > 0, because we are not the primary core. Do another
+   * atomic increment if it is 0.
+   */
+  bgtz a1, 1f
+  amoadd.w a1, t1, (t0) /* a1 is set to old value of next_logical_core_id */
+1:
+  /* The logical core ID is valid only if less than CONFIG_MAX_NUM_NODES. */
+  li t0, CONFIG_MAX_NUM_NODES
+  blt a1, t0, hsm_entry_on_secondary_hart
+
+#endif /* CONFIG_MAX_NUM_NODES > 1*/
+
+ /* If we arrive here, this hart cannot be used because the number of supported
+  * secondary hart has been exceeded. Maybe multi core support is not even
+  * enabled at all. There is no SBI HSM extension here to turn off this hart, so
+  * all we can do is spinning over a WFI. However, this is not guaranteed to
+  * work forever, because the memory where the ELF loader keeps the loop can be
+  * reused and overwritten by the kernel. This will lead to undefined behavior,
+  * as we don't know what the new contents will be. If we are lucky, the loop
+  * keeps running from a hart specific instruction cache, so the new memory
+  * contents are ignored because no synchronization is triggered.
+  */
+1:
+  wfi
+  j 1b
+/*----------------------------------------------------------------------------*/
+hsm_entry_on_primary_hart:
+  /* SBI has started us on a designated secondary hart, so we used the SBI HSM
+   * extension to switch to the designated primary hart. The secondary hart was
+   * shut down, so we can bring is up via the HSM extension when needed.
+   * The register setup is:
+   *   a0: hard ID
+   *   a1: custom parameter: DTB from bootloader
+   */
+
 .option push
 .option norelax
 1:auipc gp, %pcrel_hi(__global_pointer$)
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
   la sp, (elfloader_stack + BIT(CONFIG_KERNEL_STACK_BITS))
-  /* Jump via a register, as this can cover a bigger range. */
-  la s0, main
-  jr s0
+  li a2, 1 /* remember that the HSM extension is available */
+  la t1, main
+  jr t1
 
 /*----------------------------------------------------------------------------*/
+#if CONFIG_MAX_NUM_NODES > 1
+
 .global hsm_entry_on_secondary_hart
 hsm_entry_on_secondary_hart:
+  /* We enter here when the ELF-Loader starts a secondary hart via the SBI HSM
+   * extension.
+   * The register setup is:
+   *   a0: hard ID
+   *   a1: custom parameter: logical core ID
+   * All we have to do here is set up a the register gp and sp before jumping to
+   * C code.
+   */
 
 .option push
 .option norelax
@@ -135,30 +203,17 @@ hsm_entry_on_secondary_hart:
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
 
-#if CONFIG_MAX_NUM_NODES > 1
-  la a1, next_logical_core_id
-  li t2, 1
-  /* atomically increment next_logical_core_id by one, afterwards a1 holds value
-   * before the update - which is our logical core ID.
-   */
-  amoadd.w a1, t2, (a1)
-  li t2, CONFIG_MAX_NUM_NODES
-  bge a1, t2, hsm_suspend_hart
-  /* setup the hart specific stack pointer */
+  /* setup stack based on the logical ID */
   la sp, elfloader_stack
   addi t0, a1, 1 /* increment by one because we need to set sp to the end */
   slli t0, t0, CONFIG_KERNEL_STACK_BITS /* t0 = t0 * BIT(CONFIG_KERNEL_STACK_BITS) */
   add sp, sp, t0
-  la s0, secondary_hart_main
-  jr s0
-#endif
-/* If we get here then the HSM extension exists and the current
- * HART is not going to be used and needs to be suspended. */
-hsm_suspend_hart:
-  li a7, SBI_HSM_BASE
-  li a6, SBI_HSM_BASE_HART_STOP
-  ecall /* call SBI to suspend current HART */
 
-spin_hart:
-  wfi
-  j spin_hart
+   * Jump to C code using a register, as this extends the jump range. Register
+   * t1 instead of t0 (x5) is used, because this is a designated additional link
+   * register making jr a call and not a jump then.
+   */
+  la t1, secondary_hart_main
+  jr t1
+
+#endif /* CONFIG_MAX_NUM_NODES > 1 */

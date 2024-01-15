@@ -166,12 +166,11 @@ static int map_kernel_window(struct image_info *kernel_info)
     return 0;
 }
 
-int hsm_exists = 0; /* assembly startup code will initialise this */
-
 #if CONFIG_MAX_NUM_NODES > 1
 
-extern void secondary_harts(word_t hart_id, word_t core_id);
-extern void hsm_entry_on_secondary_hart(void);
+/* entry if secondary harts are started via SBI HSM extension */
+extern void hsm_start_secondary_core(word_t hart_id, word_t core_id);
+extern void hsm_entry_on_secondary_hart(word_t hard_id);
 
 int secondary_go = 0;
 int next_logical_core_id = 1; /* incremented by assembly code  */
@@ -212,7 +211,7 @@ static int is_core_ready(int core_id)
     return (0 != __atomic_load_n(&core_ready[core_id], __ATOMIC_RELAXED));
 }
 
-static void start_secondary_harts(word_t primary_hart_id)
+static void start_secondary_harts(word_t primary_hart_id, word_t hsm_exists)
 {
     /* Take the multicore lock first, then start all secondary cores. This
      * ensures the boot process on the primary core can continue without running
@@ -222,6 +221,7 @@ static void start_secondary_harts(word_t primary_hart_id)
      */
     acquire_multicore_lock();
     set_secondary_cores_go();
+
     /* Start all cores */
     if (!hsm_exists) {
         /* Without the HSM extension, we can't start the cores explicitly. But
@@ -250,12 +250,10 @@ static void start_secondary_harts(word_t primary_hart_id)
             assert(remote_hart_id == primary_hart_id);
             continue; /* this is the current hart */
         }
-        /* Start secondary hart, there is nothing to pass as custom
-         * parameter thus it's 0.
-         */
+        /* Start secondary hart, pass logical hart ID. */
         sbi_hsm_ret_t ret = sbi_hart_start(remote_hart_id,
                                            hsm_entry_on_secondary_hart,
-                                           0);
+                                           next_logical_core_id++);
         if (SBI_SUCCESS != ret.code) {
             printf("ERROR: could not start hart %"PRIu_word", failure"
                    " (%d, %d)\n", remote_hart_id, ret.code, ret.data);
@@ -368,13 +366,22 @@ NORETURN void secondary_hart_main(word_t hart_id, word_t core_id)
 }
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
-void main(word_t hart_id, void *bootloader_dtb)
+void main(word_t hart_id, void *bootloader_dtb, UNUSED word_t hsm_exists)
 {
     /* Printing uses SBI, so there is no need to initialize any UART. */
-    printf("ELF-loader started on (HART %"PRIu_word") (NODES %d)\n",
-           hart_id, (unsigned int)CONFIG_MAX_NUM_NODES);
+    printf("ELF-loader started on hart %"PRIu_word"\n", hart_id);
+    printf("  MAX_NUM_NODES: %u, SBI HSM extension: %s\n",
+           (unsigned int)CONFIG_MAX_NUM_NODES,
+           hsm_exists ? "available" : "missing");
+    printf("  phys area of binary: [%p..%p]\n", _text, _end - 1);
+    printf("  DTB from bootloader: %p\n", bootloader_dtb);
 
-    printf("  paddr=[%p..%p]\n", _text, _end - 1);
+    if (hart_id != CONFIG_FIRST_HART_ID) {
+        printf("ERROR: ELF-loader not is running on FIRST_HART_ID (%d)\n",
+               (unsigned int)CONFIG_FIRST_HART_ID);
+        abort();
+        UNREACHABLE();
+    }
 
     int ret = run_elfloader(bootloader_dtb);
     if (0 != ret) {
@@ -385,7 +392,7 @@ void main(word_t hart_id, void *bootloader_dtb)
     }
 
 #if CONFIG_MAX_NUM_NODES > 1
-    start_secondary_harts(hart_id);
+    start_secondary_harts(hart_id, hsm_exists);
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
     boot_hart(hart_id, 0);
