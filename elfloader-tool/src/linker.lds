@@ -55,8 +55,14 @@ SECTIONS
         *(.data.*)
     }
     . = ALIGN(16);
-    .bss :
+    .bss (NOLOAD) :
     {
+#ifdef CONFIG_ARCH_ARM
+        . = ALIGN(0x1000);
+        core_stack_alloc = .;
+        . += CONFIG_MAX_NUM_NODES * (1 << 12);
+        core_stack_alloc_end = .;
+#endif
         _bss = .;
         *(.sbss*)
         *(.bss)
