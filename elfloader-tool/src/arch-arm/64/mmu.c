@@ -142,14 +142,19 @@ static inline uint64_t make_pde_from_ptr(pte_t *pagetable_target)
     return make_pde(va_to_pa((uintptr_t)pagetable_target));
 }
 
-/* ARM DDI 0487I.a, section D8.5.2 */
+/* ARM DDI 0487J.a, section D8.5.2 */
 #define INNER_SHAREABLE   3
 static inline uint64_t make_pte(paddr_t pa, uint8_t mem_attr_index)
 {
-    /* Note: As per R_PYFVQ from the ARM spec, we can always safely set the
-     *       shareability to inner, even for device-type memory.
+    /* As per R_PYFVQ from the ARM spec, we can always safely set the shareability
+     * to inner, even for Device memory type.
+     * For exec-never bit(s), see Table D8-46 for EL2 translation regime (TR)
+     * and Table D8-45 for all others.
+     * PXN (bit 53) is RES0 for EL2 TR (Figure D8-16), so we simply always set it.
      */
-    return mask_pa(pa)
+    uint64_t xn = (IS_DEV_MEM_INDEX(mem_attr_index)) ? (BIT(54) | BIT(53)) : 0;
+    return xn
+           | mask_pa(pa)
            | BIT(10) /* access flag */
 #if CONFIG_MAX_NUM_NODES > 1
            | (INNER_SHAREABLE << 8)

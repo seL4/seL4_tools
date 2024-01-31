@@ -63,3 +63,5 @@
 #define MT_NORMAL         4
 #define MT_NORMAL_WT      5
 #define MAIR(_attr, _mt)  ((_attr) << ((_mt) * 8))
+
+#define IS_DEV_MEM_INDEX(_idx) ((_idx) <= MT_DEVICE_GRE)
