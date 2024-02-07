@@ -156,9 +156,7 @@ static inline uint64_t make_pte(paddr_t pa, uint8_t mem_attr_index)
     return xn
            | mask_pa(pa)
            | BIT(10) /* access flag */
-#if CONFIG_MAX_NUM_NODES > 1
            | (INNER_SHAREABLE << 8)
-#endif
            | (mem_attr_index << 2)
            | BIT(0); /* valid page/block mapping */
 }
