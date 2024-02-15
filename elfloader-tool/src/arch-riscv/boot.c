@@ -57,11 +57,44 @@ unsigned long l2pt[PTES_PER_PT] __attribute__((aligned(4096)));
 unsigned long l2pt_elf[PTES_PER_PT] __attribute__((aligned(4096)));
 #endif
 
-char elfloader_stack_alloc[BIT(CONFIG_KERNEL_STACK_BITS)];
+/* Stacks for each core are set up in the assembly startup code. */
+char elfloader_stack[CONFIG_MAX_NUM_NODES * BIT(CONFIG_KERNEL_STACK_BITS)] __attribute__((aligned(4096)));
 
 /* first HART will initialise these */
 void const *dtb = NULL;
 size_t dtb_size = 0;
+
+static inline void sfence_vma(void)
+{
+    asm volatile("sfence.vma" ::: "memory");
+}
+
+static inline void ifence(void)
+{
+    asm volatile("fence.i" ::: "memory");
+}
+
+#if CONFIG_PT_LEVELS == 2
+uint64_t vm_mode = 0x1llu << 31;
+#elif CONFIG_PT_LEVELS == 3
+uint64_t vm_mode = 0x8llu << 60;
+#elif CONFIG_PT_LEVELS == 4
+uint64_t vm_mode = 0x9llu << 60;
+#else
+#error "Wrong PT level"
+#endif
+
+static inline void enable_virtual_memory(void)
+{
+    sfence_vma();
+    asm volatile(
+        "csrw satp, %0\n"
+        :
+        : "r"(vm_mode | (uintptr_t)l1pt >> RISCV_PGSHIFT)
+        :
+    );
+    ifence();
+}
 
 /*
  * overwrite the default implementation for abort()
@@ -133,64 +166,70 @@ static int map_kernel_window(struct image_info *kernel_info)
     return 0;
 }
 
-#if CONFIG_PT_LEVELS == 2
-uint64_t vm_mode = 0x1llu << 31;
-#elif CONFIG_PT_LEVELS == 3
-uint64_t vm_mode = 0x8llu << 60;
-#elif CONFIG_PT_LEVELS == 4
-uint64_t vm_mode = 0x9llu << 60;
-#else
-#error "Wrong PT level"
-#endif
-
-int hsm_exists = 0;
+int hsm_exists = 0; /* assembly startup code will initialise this */
 
 #if CONFIG_MAX_NUM_NODES > 1
 
-extern void secondary_harts(unsigned long);
+extern void secondary_harts(word_t hart_id, word_t core_id);
 
 int secondary_go = 0;
-int next_logical_core_id = 1;
+int next_logical_core_id = 1; /* incremented by assembly code  */
 int mutex = 0;
 int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
-static void set_and_wait_for_ready(int hart_id, int core_id)
-{
-    /* Acquire lock to update core ready array */
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Hart ID %d core ID %d\n", hart_id, core_id);
-    core_ready[core_id] = 1;
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 
-    /* Wait untill all cores are go */
-    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (__atomic_load_n(&core_ready[i], __ATOMIC_RELAXED) == 0) ;
+static void acquire_multicore_lock(void)
+{
+    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0) {
+        /* busy waiting loop */
     }
 }
-#endif
 
-static inline void sfence_vma(void)
+static void release_multicore_lock(void)
 {
-    asm volatile("sfence.vma" ::: "memory");
+    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 }
 
-static inline void ifence(void)
+static void set_secondary_cores_go(void)
 {
-    asm volatile("fence.i" ::: "memory");
+    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
 }
 
-static inline void enable_virtual_memory(void)
+static void block_until_secondary_cores_go(void)
 {
-    sfence_vma();
-    asm volatile(
-        "csrw satp, %0\n"
-        :
-        : "r"(vm_mode | (uintptr_t)l1pt >> RISCV_PGSHIFT)
-        :
-    );
-    ifence();
+    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) {
+        /* busy waiting loop */
+    }
 }
 
-static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
+static void mark_core_ready(int core_id)
+{
+    core_ready[core_id] = 1;
+}
+
+static int is_core_ready(int core_id)
+{
+    return (0 != __atomic_load_n(&core_ready[core_id], __ATOMIC_RELAXED));
+}
+
+static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
+{
+    /* Acquire lock to update core ready array */
+    acquire_multicore_lock();
+    printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
+    mark_core_ready(core_id);
+    release_multicore_lock();
+
+    /* Wait until all cores are go */
+    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
+        while (!is_core_ready(i)) {
+            /* busy waiting loop */
+        }
+    }
+}
+
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
+
+static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 {
     int ret;
 
@@ -216,24 +255,21 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
     }
 
 #if CONFIG_MAX_NUM_NODES > 1
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Main entry hart_id:%d\n", hart_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
-
+    acquire_multicore_lock();
+    printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
+    release_multicore_lock();
     /* Unleash secondary cores */
-    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
-
+    set_secondary_cores_go();
     /* Start all cores */
-    int i = 0;
+    word_t i = 0;
     while (i < CONFIG_MAX_NUM_NODES && hsm_exists) {
         i++;
         if (i != hart_id) {
             sbi_hart_start(i, secondary_harts, i);
         }
     }
-
     set_and_wait_for_ready(hart_id, 0);
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
 
     printf("Enabling MMU and paging\n");
     enable_virtual_memory();
@@ -249,7 +285,7 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
                                                   ,
                                                   hart_id,
                                                   0
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
                                                  );
 
     /* We should never get here. */
@@ -259,19 +295,15 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
 
 #if CONFIG_MAX_NUM_NODES > 1
 
-void secondary_entry(int hart_id, int core_id)
+void secondary_entry(word_t hart_id, word_t core_id)
 {
-    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) ;
-
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Secondary entry hart_id:%d core_id:%d\n", hart_id, core_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
-
+    block_until_secondary_cores_go();
+    acquire_multicore_lock();
+    printf("Secondary entry hart_id:%"PRIu_word" core_id:%"PRIu_word"\n",
+           hart_id, core_id);
+    release_multicore_lock();
     set_and_wait_for_ready(hart_id, core_id);
-
     enable_virtual_memory();
-
-
     /* If adding or modifying these parameters you will need to update
         the registers in head.S */
     ((init_riscv_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
@@ -285,13 +317,13 @@ void secondary_entry(int hart_id, int core_id)
                                                  );
 }
 
-#endif
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
 
-void main(int hart_id, void *bootloader_dtb)
+void main(word_t hart_id, void *bootloader_dtb)
 {
     /* Printing uses SBI, so there is no need to initialize any UART. */
-    printf("ELF-loader started on (HART %d) (NODES %d)\n",
-           hart_id, CONFIG_MAX_NUM_NODES);
+    printf("ELF-loader started on (HART %"PRIu_word") (NODES %d)\n",
+           hart_id, (unsigned int)CONFIG_MAX_NUM_NODES);
 
     printf("  paddr=[%p..%p]\n", _text, _end - 1);
 
