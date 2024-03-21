@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-only
  */
+#include <autoconf.h>
 #include <elfloader_common.h>
 #include <devices_gen.h>
 #include <drivers/common.h>
@@ -24,7 +25,13 @@ static int smp_psci_cpu_on(UNUSED struct elfloader_device *dev,
     }
     secondary_data.entry = entry;
     secondary_data.stack = stack;
-    dmb();
+#if defined(CONFIG_ARCH_AARCH64)
+    /* If the secondary core caches are off, need to make sure that the info
+     * is clean to the physical memory so that the sedcondary cores can read it.
+     */
+    asm volatile("dc cvac, %0" :: "r"(&secondary_data));
+    dsb();
+#endif
     int ret = psci_cpu_on(cpu->cpu_id, (unsigned long)&secondary_startup, 0);
     if (ret != PSCI_SUCCESS) {
         printf("Failed to bring up core 0x%x with error %d\n", cpu->cpu_id, ret);
