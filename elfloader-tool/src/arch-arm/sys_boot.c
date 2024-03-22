@@ -104,7 +104,7 @@ void main(UNUSED void *arg)
     void *bootloader_dtb = NULL;
 
     /* initialize platform to a state where we can print to a UART */
-    if (initialise_devices()) {
+    if (0 != initialise_devices()) {
         printf("ERROR: Did not successfully return from initialise_devices()\n");
         abort();
     }
@@ -179,7 +179,7 @@ void continue_boot(int was_relocated)
      * driver model so all its pointers are set up properly.
      */
     if (was_relocated) {
-        if (initialise_devices()) {
+        if (0 != initialise_devices()) {
             printf("ERROR: Did not successfully return from initialise_devices()\n");
             abort();
         }
