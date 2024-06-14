@@ -9,8 +9,11 @@
 
 .extern main
 .extern __global_pointer$
-.extern elfloader_stack_alloc
+.extern elfloader_stack
 .extern hsm_exists
+#if CONFIG_MAX_NUM_NODES > 1
+.extern next_logical_core_id
+#endif
 
 #define BIT(n) (1 << (n))
 
@@ -56,7 +59,7 @@ _start:
   mv s2, a1 /* preserve a1 (dtb) in s2 */
 
   /* Attach the stack to sp before calling any C functions */
-  la sp, (elfloader_stack_alloc + BIT(12))
+  la sp, (elfloader_stack + BIT(CONFIG_KERNEL_STACK_BITS))
 
 #ifdef CONFIG_IMAGE_BINARY
 /* Clear the BSS before we get to do anything more specific */
@@ -104,37 +107,28 @@ hsm_switch_hart:
   mv a0, s0 /* restore a0 to hold hart ID passed by OpenSBI */
   j secondary_harts
 
-
-_start1: /* a0 must hold current hard ID passed by bootloader */
-         /* a1 must hold dtb address passed by bootloader */
+/*----------------------------------------------------------------------------*/
+_start1:
+/* This is basically an asm wrapper to jump to the C code at main(). The
+ * registers are already set up with the perameters for the C code:
+ *   a0 holds current hard ID passed by bootloader
+ *   a1 holds dtb address passed by bootloader
+ * All that is left to be done here is setting up the registers gp and sp to
+ * have a proper C environment. The hart we are running on now could be a
+ * different HART to the one that we have been on in _start. The original hart
+ * we came from will get a different stack in secondary_harts.
+ */
 .option push
 .option norelax
 1:auipc gp, %pcrel_hi(__global_pointer$)
   addi  gp, gp, %pcrel_lo(1b)
 .option pop
-
-  /* Attach the stack to sp before calling any C functions */
-  /* This HART may be a different HART to the one that started at _start
-   * If we've switched HARTs then the other HART will get a different stack
-   * region in secondary_harts. */
-  la sp, (elfloader_stack_alloc + BIT(12))
-  /* The C code expects the registers to be set up as:
-   *   a0 = hart id
-   *   a1 = dtb
-   */
+  la sp, (elfloader_stack + BIT(CONFIG_KERNEL_STACK_BITS))
+  /* Jump via a register, as this can cover a bigger range. */
   la s0, main
   jr s0
 
-#if CONFIG_MAX_NUM_NODES > 1
-.extern next_logical_core_id
-.data
-bootstack_secondary_cores:
-.align 12
-.space 4096 * (CONFIG_MAX_NUM_NODES - 1)
-#endif
-
-.text
-
+/*----------------------------------------------------------------------------*/
 .global secondary_harts
 secondary_harts:
 
@@ -147,14 +141,16 @@ secondary_harts:
 #if CONFIG_MAX_NUM_NODES > 1
   la a1, next_logical_core_id
   li t2, 1
-  amoadd.w t0, t2, (a1)
-  /* now a1 has the logical core id */
+  /* atomically increment next_logical_core_id by one, afterwards a1 holds value
+   * before the update - which is our logical core ID.
+   */
+  amoadd.w a1, t2, (a1)
   li t2, CONFIG_MAX_NUM_NODES
-  bge t0, t2, hsm_suspend_hart
-
-  mv a1, t0
-  slli t0, t0, 12
-  la sp, bootstack_secondary_cores
+  bge a1, t2, hsm_suspend_hart
+  /* setup the hart specific stack pointer */
+  la sp, elfloader_stack
+  addi t0, a1, 1 /* increment by one because we need to set sp to the end */
+  slli t0, t0, CONFIG_KERNEL_STACK_BITS /* t0 = t0 * BIT(CONFIG_KERNEL_STACK_BITS) */
   add sp, sp, t0
   la s0, secondary_entry
   jr s0
