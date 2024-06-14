@@ -18,6 +18,9 @@ void uart_set_out(struct elfloader_device *out)
         return;
     }
     uart_out = out;
+#if defined(CONFIG_ARCH_AARCH64)
+    mmu_set_uart_base(out->region_bases[0]);
+#endif
 }
 
 volatile void *uart_get_mmio(void)

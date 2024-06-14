@@ -23,7 +23,7 @@
 #define DTB_MAGIC (0xedfe0dd0)
 
 /* Maximum alignment we need to preserve when relocating (64K) */
-#define MAX_ALIGN_BITS (14)
+#define MAX_ALIGN_BITS (16)
 
 #ifdef CONFIG_IMAGE_EFI
 ALIGN(BIT(PAGE_BITS)) VISIBLE
@@ -168,6 +168,92 @@ void main(UNUSED void *arg)
     abort();
 }
 
+/* ARMv8 64-bit specific implementation of continue_boot() */
+#if defined(CONFIG_ARCH_AARCH64)
+void continue_boot(int was_relocated)
+{
+    if (was_relocated) {
+        printf("ELF loader relocated, continuing boot...\n");
+    }
+
+    /*
+     * If we were relocated, we need to re-initialise the
+     * driver model so all its pointers are set up properly.
+     */
+    if (was_relocated) {
+        initialise_devices();
+    }
+
+    /* Setup MMU. */
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT)
+    init_hyp_boot_vspace(&kernel_info);
+#else
+    init_boot_vspace(&kernel_info);
+#endif
+
+    if (is_hyp_mode()) {
+        extern void clean_dcache_by_range(paddr_t start, paddr_t end);
+
+        paddr_t start = kernel_info.phys_region_start;
+        paddr_t end = kernel_info.phys_region_end;
+        clean_dcache_by_range(start, end);
+
+        start = (paddr_t)user_info.phys_region_start;
+        end = (paddr_t)user_info.phys_region_end;
+        clean_dcache_by_range(start, end);
+
+        start = (paddr_t)_text;
+        end = (paddr_t)_end;
+        clean_dcache_by_range(start, end);
+
+        if (dtb) {
+            start = (paddr_t)dtb;
+            end = start + dtb_size;
+            clean_dcache_by_range(start, end);
+        }
+
+#if defined(CONFIG_ARM_HYPERVISOR_SUPPORT)
+        printf("Switch to hypervisor mapping\n");
+        arm_switch_to_hyp_tables();
+#else
+        extern void leave_hyp(void);
+        /* Switch to EL1, assume EL2 MMU already disabled for ARMv8. */
+        leave_hyp();
+#endif
+    }
+
+#if CONFIG_MAX_NUM_NODES > 1
+    smp_boot();
+#endif /* CONFIG_MAX_NUM_NODES */
+
+    if (is_hyp_mode()) {
+        /* Nothing to be done here, we already switched above */
+    } else {
+        printf("Enabling MMU and paging\n");
+        arm_enable_mmu();
+    }
+
+    /* Enter kernel. The UART may no longer be accessible here. */
+    if ((uintptr_t)uart_get_mmio() < kernel_info.virt_region_start) {
+        printf("Jumping to kernel-image entry point...\n\n");
+    }
+
+    /* Clear D&A in DAIF */
+    asm volatile("msr daifclr, #0xC\n\t");
+
+    /* Jump to the kernel. Note: Our DTB is smaller than 4 GiB. */
+    ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
+                                                user_info.phys_region_end,
+                                                user_info.phys_virt_offset,
+                                                user_info.virt_entry,
+                                                (word_t)dtb,
+                                                (uint32_t)dtb_size);
+
+    /* We should never get here. */
+    printf("ERROR: Kernel returned back to the ELF Loader\n");
+    abort();
+}
+#else
 void continue_boot(int was_relocated)
 {
     if (was_relocated) {
@@ -232,3 +318,4 @@ void continue_boot(int was_relocated)
     printf("ERROR: Kernel returned back to the ELF Loader\n");
     abort();
 }
+#endif

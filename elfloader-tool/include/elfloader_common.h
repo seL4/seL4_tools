@@ -14,7 +14,7 @@ typedef uintptr_t vaddr_t;
 
 #define PAGE_BITS           12
 
-#define BIT(x)              (1 << (x))
+#define BIT(x)              (1ul << (x))
 #define MASK(n)             (BIT(n) - 1)
 #define MIN(a, b)           (((a) < (b)) ? (a) : (b))
 #define IS_ALIGNED(n, b)    (!((n) & MASK(b)))
