@@ -430,6 +430,9 @@ int load_images(
         return -1;
     }
 
+    /* Reserve space for the kernel, keep next start address page aligned. */
+    next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
+
     void const *dtb = NULL;
 
 #ifdef CONFIG_ELFLOADER_INCLUDE_DTB
@@ -465,9 +468,7 @@ int load_images(
      * Move the DTB out of the way, if it's present.
      */
     if (dtb) {
-        /* keep it page aligned */
-        next_phys_addr = dtb_phys_start = ROUND_UP(kernel_phys_end, PAGE_BITS);
-
+        dtb_phys_start = next_phys_addr;
         size_t dtb_size = fdt_size(dtb);
         if (0 == dtb_size) {
             printf("ERROR: Invalid device tree blob supplied\n");
@@ -491,8 +492,6 @@ int load_images(
         printf("   paddr=[%p..%p]\n", dtb_phys_start, dtb_phys_end - 1);
         *chosen_dtb = (void *)dtb_phys_start;
         *chosen_dtb_size = dtb_size;
-    } else {
-        next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
     }
 
     /* Load the kernel */
