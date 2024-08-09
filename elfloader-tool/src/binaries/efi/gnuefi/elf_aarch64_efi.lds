@@ -31,6 +31,9 @@ SECTIONS
    *(.data)
    *(.data1)
    *(.data.*)
+   __start__driver_list = .;
+   *(_driver_list)
+   __stop__driver_list = .;
    *(.got.plt)
    *(.got)
 

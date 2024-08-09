@@ -35,6 +35,12 @@ void core_entry(uint64_t sp)
 
 int is_core_up(int i)
 {
+    /* Secondary core may be booted with caches disabled,
+     * this value might be written in memory, invalidate our
+     * copy and get a new one. */
+    asm volatile("dc ivac, %0\n\t"
+                 "dmb nsh\n\t"
+                 :: "r"(&core_up[i]));
     return core_up[i] == i;
 }
 
