@@ -46,29 +46,34 @@ macro(add_default_compilation_options)
 
     if(KernelArchX86)
         add_compile_options(-mtls-direct-seg-refs)
-    endif()
 
-    if(KernelSel4ArchAarch32)
-        add_compile_options(-mtp=soft)
-    endif()
+    elseif(KernelArchARM)
+        if(KernelSel4ArchAarch32)
+            add_compile_options(-mtp=soft -mno-unaligned-access)
+        elseif(KernelSel4ArchAarch64)
+            # Don't allow unaligned data store/load instructions, This will
+            # cause an alignment fault on any uncached seL4 memory regions,
+            # because the kernel enabled alignment checks inm the mapping
+            # attributes.
+            add_compile_options(-mstrict-align)
 
-    # Don't allow unaligned data store/load instructions as this will cause an alignment
-    # fault on any seL4 memory regions that are uncached as the mapping attributes the kernel
-    # uses causes alignment checks to be enabled.
-    if(KernelSel4ArchAarch64)
-        add_compile_options(-mstrict-align)
-        if(NOT CMAKE_C_COMPILER_VERSION)
-            message(FATAL_ERROR "CMAKE_C_COMPILER_VERSION is not set")
+            if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+                if(NOT CMAKE_C_COMPILER_VERSION)
+                    message(FATAL_ERROR "CMAKE_C_COMPILER_VERSION is not set")
+                elseif(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0.0")
+                    # special handling for GCC 10 and above
+                    add_compile_options(-mno-outline-atomics)
+                endif()
+            endif()
+        else()
+            message(FATAL_ERROR "unknown ARM KernelSel4Arch '${KernelSel4Arch}'")
         endif()
-        # special handling for GCC 10 and above
-        if(
-            (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-            AND (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0.0")
-        )
-            add_compile_options(-mno-outline-atomics)
-        endif()
-    elseif(KernelSel4ArchAarch32)
-        add_compile_options(-mno-unaligned-access)
+
+    elseif(KernelArchRiscV)
+        # nothing special
+
+    else()
+        message(FATAL_ERROR "unknown KernelArch '${KernelArch}'")
     endif()
 endmacro()
 
