@@ -39,21 +39,6 @@ BEGIN_FUNC(flush_dcache)
 END_FUNC(flush_dcache)
 
 BEGIN_FUNC(arm_enable_mmu)
-    /* We call nested functions, follow the ABI. */
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-
-    bl      flush_dcache
-
-    /* Ensure I-cache, D-cache and mmu are disabled for EL1/Stage1 */
-    disable_mmu sctlr_el1 , x8
-
-    /*
-     * Invalidate the local I-cache so that any instructions fetched
-     * speculatively are discarded.
-     */
-    bl      invalidate_icache
-
     /*
      *   DEVICE_nGnRnE      000     00000000
      *   DEVICE_nGnRE       001     00000100
@@ -92,6 +77,5 @@ BEGIN_FUNC(arm_enable_mmu)
     adrp    x8, arm_vector_table
     msr     vbar_el1, x8
 
-    ldp     x29, x30, [sp], #16
     ret
 END_FUNC(arm_enable_mmu)
