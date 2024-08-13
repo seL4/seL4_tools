@@ -6,6 +6,7 @@
 
 #include <armv/machine.h>
 #include <types.h>
+#include <cpuid.h>
 
 /* we only care about the affinity bits */
 #define MPIDR_MASK (0xff00ffffff)
