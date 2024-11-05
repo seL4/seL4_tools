@@ -166,6 +166,11 @@ function(GenerateSimulateScript)
     else()
         set(error "Unsupported platform or architecture for simulation")
     endif()
+
+    if(SMP)
+        string(APPEND qemu_sim_extra_args " -smp ${KernelMaxNumNodes}")
+    endif()
+
     set(sim_path "${CMAKE_BINARY_DIR}/simulate")
     set(gdb_path "${CMAKE_BINARY_DIR}/launch_gdb")
     if(NOT "${error}" STREQUAL "")
