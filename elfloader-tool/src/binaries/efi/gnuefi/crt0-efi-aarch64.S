@@ -64,7 +64,7 @@ extra_header_fields:
 	.short	0				// MinorSubsystemVersion
 	.long	0				// Win32VersionValue
 
-	.long	_edata - ImageBase		// SizeOfImage
+	.long	_end - ImageBase		// SizeOfImage
 
 	// Everything before the kernel image is considered part of the header
 	.long	_gnuefi_start - ImageBase		// SizeOfHeaders

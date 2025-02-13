@@ -21,31 +21,32 @@
 .extern invalidate_icache
 .extern _boot_pgd_down
 
-BEGIN_FUNC(disable_caches_hyp)
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-    bl      flush_dcache
-    disable_id_cache sctlr_el2, x9
-    ldp     x29, x30, [sp], #16
+BEGIN_FUNC(clean_dcache_by_range)
+    /* Ordering needed for strongly-ordered mem, not needed for NORMAL mem.
+     * See ARM DDI 0487I.a, page D7-5063.
+     */
+    dmb     sy
+
+    /* Extract minimum DCache CL size into x3 and CL mask into x4 */
+    mrs x2, ctr_el0
+    ubfx x4, x2, #16, #4
+    mov x3, #4
+    lsl x3, x3, x4
+    sub x4, x3, #1
+
+    /* Apply mask to start address before entering the loop */
+    bic x4, x0, x4
+clean_dcache_by_range_loop:
+    dc cvac, x4
+    add x4, x4, x3
+    cmp x4, x1
+    b.lt clean_dcache_by_range_loop
+    dsb sy
+    isb
     ret
-END_FUNC(disable_caches_hyp)
+END_FUNC(clean_dcache_by_range)
 
 BEGIN_FUNC(leave_hyp)
-    /* We call nested functions, follow the ABI. */
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-
-    bl      flush_dcache
-
-    /* Ensure I-cache, D-cache and mmu are disabled for EL2/Stage1 */
-    disable_mmu sctlr_el2, x9
-
-    /*
-     * Invalidate the local I-cache so that any instructions fetched
-     * speculatively are discarded.
-     */
-    bl      invalidate_icache
-
     /* Ensure I-cache, D-cache and mmu are disabled for EL1/Stage2 */
     mov     x9, #(1 << 31)
     msr     hcr_el2, x9
@@ -63,23 +64,16 @@ BEGIN_FUNC(leave_hyp)
     msr     spsr_el2, x9
 
     /* Let's the caller use our stack, in case it needs to pop something */
-    ldp     x29, x30, [sp], #16
     mov     x10, sp
     msr     sp_el1, x10
     msr     elr_el2, x30
     eret
 END_FUNC(leave_hyp)
 
-BEGIN_FUNC(arm_enable_hyp_mmu)
-    stp     x29, x30, [sp, #-16]!
-    mov     x29, sp
-
-    bl      flush_dcache
-
-    disable_mmu sctlr_el2, x8
-
-    bl      invalidate_icache
-
+BEGIN_FUNC(arm_switch_to_hyp_tables)
+    /* Load MAIR & TCR values; construct TTBR address before disabling and re-
+     * enabling the MMU & caches.
+     */
     /*
      *   DEVICE_nGnRnE      000     00000000
      *   DEVICE_nGnRE       001     00000100
@@ -94,26 +88,38 @@ BEGIN_FUNC(arm_enable_hyp_mmu)
                  MAIR(0x44, MT_NORMAL_NC) | \
                  MAIR(0xff, MT_NORMAL) | \
                  MAIR(0xaa, MT_NORMAL_WT)
-    msr     mair_el2, x5
+
     ldr     x8, =TCR_T0SZ(48) | TCR_IRGN0_WBWC | TCR_ORGN0_WBWC | TCR_SH0_ISH | TCR_TG0_4K | TCR_PS | TCR_EL2_RES1
+
+    /* Use x16 as temp register */
+    disable_mmu  sctlr_el2, x16
+
+    msr     mair_el2, x5
     msr     tcr_el2, x8
     isb
 
+    /* For non-VHE the "down" contains both the the kernel mapping and 1:1 mapping. */
     adrp    x8, _boot_pgd_down
     msr     ttbr0_el2, x8
     isb
 
+     /* Invalidate TLBs */
+    dsb     sy
     tlbi    alle2is
+    tlbi    vmalls12e1
+    dsb     sy
+
+    tlbi    vmalle1is
     dsb     ish
     isb
 
-    enable_mmu  sctlr_el2, x8
+    /* Invalidate icache */
     ic  ialluis
-    dsb ish
+    dsb sy
     isb
-    tlbi    alle2is
-    dsb     ish
-    isb
-    ldp     x29, x30, [sp], #16
+
+    enable_mmu  sctlr_el2, x8
+    /* NOTE: enable_mmu already contains an isb after enabling. */
+
     ret
-END_FUNC(arm_enable_hyp_mmu)
+END_FUNC(arm_switch_to_hyp_tables)
