@@ -114,9 +114,9 @@ void main(UNUSED void *arg)
     /* Print welcome message. */
     printf("\nELF-loader started on ");
     print_cpuid();
-    printf("  paddr=[%p..%p]\n", _text, _end - 1);
+    printf("  paddr=[%p..%p]\n", _text, (uintptr_t)_end - 1);
 
-#if defined(CONFIG_IMAGE_UIMAGE)
+#if defined(CONFIG_IMAGE_UIMAGE) || defined(CONFIG_IMAGE_BINARY)
 
     /* U-Boot passes a DTB. Ancient bootloaders may pass atags. When booting via
      * bootelf argc is NULL.
