@@ -101,11 +101,13 @@ void relocate_below_kernel(void)
  */
 void main(UNUSED void *arg)
 {
+    int ret;
     void *bootloader_dtb = NULL;
 
     /* initialize platform to a state where we can print to a UART */
-    if (initialise_devices()) {
-        printf("ERROR: Did not successfully return from initialise_devices()\n");
+    ret = initialise_devices();
+    if (0 != ret) {
+        printf("ERROR: device initialization failed (%d)\n", ret);
         abort();
     }
 
@@ -144,8 +146,8 @@ void main(UNUSED void *arg)
 
     /* Unpack ELF images into memory. */
     unsigned int num_apps = 0;
-    int ret = load_images(&kernel_info, &user_info, 1, &num_apps,
-                          bootloader_dtb, &dtb, &dtb_size);
+    ret = load_images(&kernel_info, &user_info, 1, &num_apps,
+                      bootloader_dtb, &dtb, &dtb_size);
     if (0 != ret) {
         printf("ERROR: image loading failed\n");
         abort();
@@ -179,8 +181,9 @@ void continue_boot(int was_relocated)
      * driver model so all its pointers are set up properly.
      */
     if (was_relocated) {
-        if (initialise_devices()) {
-            printf("ERROR: Did not successfully return from initialise_devices()\n");
+        int ret = initialise_devices();
+        if (0 != ret) {
+            printf("ERROR: device initialization failed (%d)\n", ret);
             abort();
         }
     }
