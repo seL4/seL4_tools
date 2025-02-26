@@ -599,7 +599,7 @@ int load_images(
                        "app.bin", // hash file
                        next_phys_addr,
                        1,  // keep ELF headers
-                       &user_info[*num_images],
+                       &user_info[i],
                        &next_phys_addr);
         if (0 != ret) {
             printf("ERROR: Could not load user image ELF\n");
