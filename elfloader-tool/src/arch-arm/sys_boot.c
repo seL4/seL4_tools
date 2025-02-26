@@ -22,8 +22,13 @@
 /* 0xd00dfeed in big endian */
 #define DTB_MAGIC (0xedfe0dd0)
 
-/* Maximum alignment we need to preserve when relocating (64K) */
-#define MAX_ALIGN_BITS (14)
+/* Maximum alignment we need to preserve when relocating (64K)
+ *
+ * The 64 kiB alignment is a maximum requirement for a stage2
+ * concatenated pagetable. See Table G5-4 in ARM DDI 0487I.a, page
+ * G5-9186.
+ */
+#define MAX_ALIGN_BITS (16)
 
 #ifdef CONFIG_IMAGE_EFI
 ALIGN(BIT(PAGE_BITS)) VISIBLE
@@ -216,17 +221,23 @@ void continue_boot(int was_relocated)
         arm_enable_mmu();
     }
 
-    /* Enter kernel. The UART may no longer be accessible here. */
+    /* The UART may no longer be accessible here. */
     if ((uintptr_t)uart_get_mmio() < kernel_info.virt_region_start) {
         printf("Jumping to kernel-image entry point...\n\n");
     }
 
+#if defined(CONFIG_ARCH_AARCH64)
+    /* Clear D&A in DAIF */
+    asm volatile("msr daifclr, #0xC\n\t");
+#endif
+
+    /* Jump to the kernel. Note: Our DTB is smaller than 4 GiB. */
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end,
                                                 user_info.phys_virt_offset,
                                                 user_info.virt_entry,
                                                 (word_t)dtb,
-                                                dtb_size);
+                                                (uint32_t)dtb_size);
 
     /* We should never get here. */
     printf("ERROR: Kernel returned back to the ELF Loader\n");
