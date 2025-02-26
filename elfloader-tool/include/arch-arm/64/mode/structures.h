@@ -6,6 +6,12 @@
 
 #pragma once
 
+/* ARM VMSAv8-64 (with a fully populated last level) has the same number of PTEs
+ * in all levels (we don't use concatenated pagetables in ELFloader) and each
+ * table entry is always eight bytes large.
+ */
+#define BITS_PER_LEVEL          (PAGE_BITS - 3)
+
 #define ARM_1GB_BLOCK_BITS      30
 #define ARM_2MB_BLOCK_BITS      21
 
@@ -21,14 +27,10 @@
 #define PMD_BITS                9
 #define PMD_SIZE_BITS           (PMD_BITS + PMDE_SIZE_BITS)
 
-#define GET_PGD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS + PUD_BITS)) & MASK(PGD_BITS))
-#define GET_PUD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS)) & MASK(PUD_BITS))
-#define GET_PMD_INDEX(x)        (((x) >> (ARM_2MB_BLOCK_BITS)) & MASK(PMD_BITS))
+#define GET_PGD_INDEX(x)        (((word_t)(x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS + PUD_BITS)) & MASK(PGD_BITS))
+#define GET_PUD_INDEX(x)        (((word_t)(x) >> (ARM_2MB_BLOCK_BITS + PMD_BITS)) & MASK(PUD_BITS))
+#define GET_PMD_INDEX(x)        (((word_t)(x) >> (ARM_2MB_BLOCK_BITS)) & MASK(PMD_BITS))
 
 extern uint64_t _boot_pgd_up[BIT(PGD_BITS)];
-extern uint64_t _boot_pud_up[BIT(PUD_BITS)];
-extern uint64_t _boot_pmd_up[BIT(PMD_BITS)];
-
 extern uint64_t _boot_pgd_down[BIT(PGD_BITS)];
-extern uint64_t _boot_pud_down[BIT(PUD_BITS)];
 

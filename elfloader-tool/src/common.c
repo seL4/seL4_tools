@@ -468,29 +468,29 @@ int load_images(
         /* keep it page aligned */
         next_phys_addr = dtb_phys_start = ROUND_UP(kernel_phys_end, PAGE_BITS);
 
-        size_t dtb_size = fdt_size(dtb);
-        if (0 == dtb_size) {
+        size_t dtb_sz = fdt_size(dtb);
+        if (0 == dtb_sz) {
             printf("ERROR: Invalid device tree blob supplied\n");
             return -1;
         }
 
         /* Make sure this is a sane thing to do */
         ret = ensure_phys_range_valid(next_phys_addr,
-                                      next_phys_addr + dtb_size);
+                                      next_phys_addr + dtb_sz);
         if (0 != ret) {
             printf("ERROR: Physical address of DTB invalid\n");
             return -1;
         }
 
-        memmove((void *)next_phys_addr, dtb, dtb_size);
-        next_phys_addr += dtb_size;
+        memmove((void *)next_phys_addr, dtb, dtb_sz);
+        next_phys_addr += dtb_sz;
         next_phys_addr = ROUND_UP(next_phys_addr, PAGE_BITS);
         dtb_phys_end = next_phys_addr;
 
         printf("Loaded DTB from %p.\n", dtb);
         printf("   paddr=[%p..%p]\n", dtb_phys_start, dtb_phys_end - 1);
         *chosen_dtb = (void *)dtb_phys_start;
-        *chosen_dtb_size = dtb_size;
+        *chosen_dtb_size = dtb_sz;
     } else {
         next_phys_addr = ROUND_UP(kernel_phys_end, PAGE_BITS);
     }
