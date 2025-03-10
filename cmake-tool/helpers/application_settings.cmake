@@ -14,7 +14,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         binary_list
         "tx1;hikey;odroidc2;odroidc4;imx8mq-evk;imx8mm-evk;imx8mp-evk;hifive;bcm2837;tqma8xqp1gb;imx93;bcm2711;rocketchip;star64;cheshire"
     )
-    set(efi_list "tk1;rockpro64;quartz64")
+    set(efi_list "tk1;rockpro64;quartz64;morello-fvp;morello-soc")
     set(uimage_list "tx2;am335x")
     if(
         ${kernel_platform} IN_LIST efi_list
