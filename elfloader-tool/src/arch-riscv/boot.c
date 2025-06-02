@@ -60,8 +60,7 @@ unsigned long l2pt_elf[PTES_PER_PT] __attribute__((aligned(4096)));
 #endif
 
 /* first HART will initialise these */
-void const *dtb = NULL;
-size_t dtb_size = 0;
+dtb_info_t dtb_info;
 
 /*
  * overwrite the default implementation for abort()
@@ -183,10 +182,12 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
 {
     int ret;
 
+    dtb_info.phys_base = (paddr_t)bootloader_dtb;
+    dtb_info.size = (size_t)(-1);
+
     /* Unpack ELF images into memory. */
     unsigned int num_apps = 0;
-    ret = load_images(&kernel_info, &user_info, 1, &num_apps,
-                      bootloader_dtb, &dtb, &dtb_size);
+    ret = load_images(&kernel_info, &user_info, 1, &num_apps, &dtb_info);
     if (0 != ret) {
         printf("ERROR: image loading failed, code %d\n", ret);
         return -1;
@@ -227,13 +228,16 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
     printf("Enabling MMU and paging\n");
     enable_virtual_memory();
 
+    /* Usually DTBs are much less than 4 GiB, so this cast should be fine. */
+    uint32_t dtb_size_u32 = (uint32_t)dtb_info.size;
+
     printf("Jumping to kernel-image entry point...\n\n");
     ((init_riscv_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                   user_info.phys_region_end,
                                                   user_info.phys_virt_offset,
                                                   user_info.virt_entry,
-                                                  (word_t)dtb,
-                                                  dtb_size
+                                                  (word_t)dtb_info.phys_base,
+                                                  (word_t)dtb_size_u32
 #if CONFIG_MAX_NUM_NODES > 1
                                                   ,
                                                   hart_id,
@@ -260,6 +264,8 @@ void secondary_entry(int hart_id, int core_id)
 
     enable_virtual_memory();
 
+    /* Usually DTBs are much less than 4 GiB, so this cast should be fine. */
+    uint32_t dtb_size_u32 = (uint32_t)dtb_info.size;
 
     /* If adding or modifying these parameters you will need to update
         the registers in head.S */
@@ -267,8 +273,8 @@ void secondary_entry(int hart_id, int core_id)
                                                   user_info.phys_region_end,
                                                   user_info.phys_virt_offset,
                                                   user_info.virt_entry,
-                                                  (word_t)dtb,
-                                                  dtb_size,
+                                                  (word_t)dtb_info.phys_base,
+                                                  (word_t)dtb_size_u32,
                                                   hart_id,
                                                   core_id
                                                  );
