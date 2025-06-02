@@ -40,8 +40,9 @@ void non_boot_main(void)
     }
 
     /* Do any driver specific non_boot core init */
-    if (initialise_devices_non_boot()) {
-        printf("ERROR: Did not successfully return from initialise_devices_non_boot()\n");
+    int ret = initialise_devices_non_boot();
+    if (0 != ret) {
+        printf("ERROR: device initialization failed (%d)\n", ret);
         abort();
     }
 
