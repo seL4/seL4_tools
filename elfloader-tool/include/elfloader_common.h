@@ -34,6 +34,15 @@ typedef uintptr_t vaddr_t;
 #define ARRAY_SIZE(a)       (sizeof(a)/sizeof((a)[0]))
 #define NULL                ((void *)0)
 
+
+/*
+ * Information about a DTB we are loading.
+ */
+typedef struct {
+    paddr_t phys_base;
+    size_t size;
+} dtb_info_t;
+
 /*
  * Information about an image we are loading.
  */
@@ -93,9 +102,7 @@ int load_images(
     struct image_info *user_info,
     unsigned int max_user_images,
     unsigned int *num_images,
-    void const *bootloader_dtb,
-    void const **chosen_dtb,
-    size_t *chosen_dtb_size);
+    dtb_info_t *dtb_info);
 
 /* Platform functions */
 void platform_init(void);

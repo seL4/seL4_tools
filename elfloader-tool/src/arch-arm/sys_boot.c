@@ -32,8 +32,7 @@ char core_stack_alloc[CONFIG_MAX_NUM_NODES][BIT(PAGE_BITS)];
 
 struct image_info kernel_info;
 struct image_info user_info;
-void const *dtb;
-size_t dtb_size;
+dtb_info_t dtb_info;
 
 extern void finish_relocation(int offset, void *_dynamic, unsigned int total_offset);
 void continue_boot(int was_relocated);
@@ -101,8 +100,6 @@ void relocate_below_kernel(void)
  */
 void main(UNUSED void *arg)
 {
-    void *bootloader_dtb = NULL;
-
     /* initialize platform to a state where we can print to a UART */
     if (initialise_devices()) {
         printf("ERROR: Did not successfully return from initialise_devices()\n");
@@ -116,13 +113,22 @@ void main(UNUSED void *arg)
     print_cpuid();
     printf("  paddr=[%p..%p]\n", _text, (uintptr_t)_end - 1);
 
+    /* Assume by default, that no DTB is provided from a previous
+     * bootloader stage. Since 0 is a valid physical address, the size
+     * field is used to indicate if the address is valid. The value -1
+     * is to be used if the actual size is not known.
+     */
+    dtb_info.phys_base = 0;
+    dtb_info.size = 0;
+
 #if defined(CONFIG_IMAGE_UIMAGE)
 
     /* U-Boot passes a DTB. Ancient bootloaders may pass atags. When booting via
      * bootelf argc is NULL.
      */
     if (arg && (DTB_MAGIC == *(uint32_t *)arg)) {
-        bootloader_dtb = arg;
+        dtb_info.phys_base = (paddr_t)arg;
+        dtb_info.size = (size_t)(-1);
     }
 
 #elif defined(CONFIG_IMAGE_EFI)
@@ -132,20 +138,24 @@ void main(UNUSED void *arg)
         abort();
     }
 
-    bootloader_dtb = efi_get_fdt();
+    /* For EFI, the DTB address is not supposed to be 0. */
+    void *efi_dtb = efi_get_fdt();
+    if (efi_dtb) {
+        dtb_info.phys_base = (paddr_t)efi_dtb;
+        dtb_info.size = (size_t)(-1);
+    }
 
 #endif
 
-    if (bootloader_dtb) {
-        printf("  dtb=%p\n", bootloader_dtb);
+    if (0 != dtb_info.size) {
+        printf("  dtb=%p\n", dtb_info.phys_base);
     } else {
         printf("No DTB passed in from boot loader.\n");
     }
 
     /* Unpack ELF images into memory. */
     unsigned int num_apps = 0;
-    int ret = load_images(&kernel_info, &user_info, 1, &num_apps,
-                          bootloader_dtb, &dtb, &dtb_size);
+    int ret = load_images(&kernel_info, &user_info, 1, &num_apps, &dtb_info);
     if (0 != ret) {
         printf("ERROR: image loading failed\n");
         abort();
@@ -221,12 +231,15 @@ void continue_boot(int was_relocated)
         printf("Jumping to kernel-image entry point...\n\n");
     }
 
+    /* Usually DTBs are much less than 4 GiB, so this cast should be fine. */
+    uint32_t dtb_size_u32 = (uint32_t)dtb_info.size;
+
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end,
                                                 user_info.phys_virt_offset,
                                                 user_info.virt_entry,
-                                                (word_t)dtb,
-                                                dtb_size);
+                                                (word_t)dtb_info.phys_base,
+                                                (word_t)dtb_size_u32);
 
     /* We should never get here. */
     printf("ERROR: Kernel returned back to the ELF Loader\n");
