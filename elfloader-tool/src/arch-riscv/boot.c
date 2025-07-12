@@ -213,9 +213,7 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
     __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
 
     /* Start all cores */
-    int i = 0;
-    while (i < CONFIG_MAX_NUM_NODES && hsm_exists) {
-        i++;
+    for (int i = 0; i < CONFIG_MAX_NUM_NODES && hsm_exists; i++) {
         if (i != hart_id) {
             sbi_hart_start(i, secondary_harts, i);
         }
