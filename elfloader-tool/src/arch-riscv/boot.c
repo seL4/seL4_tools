@@ -127,16 +127,6 @@ static int map_kernel_window(struct image_info *kernel_info)
     return 0;
 }
 
-#if CONFIG_PT_LEVELS == 2
-word_t vm_mode = WORD_CONST(0x1) << 31;
-#elif CONFIG_PT_LEVELS == 3
-word_t vm_mode = WORD_CONST(0x8) << 60;
-#elif CONFIG_PT_LEVELS == 4
-word_t vm_mode = WORD_CONST(0x9) << 60;
-#else
-#error "Wrong PT level"
-#endif
-
 int hsm_exists = 0; /* assembly startup code will initialise this */
 
 #if CONFIG_MAX_NUM_NODES > 1
@@ -178,6 +168,17 @@ static inline void ifence(void)
 static inline void enable_virtual_memory(void)
 {
     sfence_vma();
+
+#if CONFIG_PT_LEVELS == 2
+    const word_t vm_mode = WORD_CONST(0x1) << 31;
+#elif CONFIG_PT_LEVELS == 3
+    const word_t vm_mode = WORD_CONST(0x8) << 60;
+#elif CONFIG_PT_LEVELS == 4
+    const word_t vm_mode = WORD_CONST(0x9) << 60;
+#else
+#error "Wrong PT level"
+#endif
+
     asm volatile(
         "csrw satp, %0\n"
         :
