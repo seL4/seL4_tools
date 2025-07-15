@@ -220,11 +220,16 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
      */
     __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
 
-    /* Start all other cores */
-    for (unsigned int i = 0; i < CONFIG_MAX_NUM_NODES && hsm_exists; ++i) {
-        unsigned int h = i + CONFIG_FIRST_HART_ID;
-        if (h != hart_id) {
-            sbi_hart_start(h, secondary_harts, h);
+    /* If SBI implements HSM, then use it to start the other cores. Otherwise
+     * all we can do here is hope they have been started somehow and report
+     * they are ready.
+     */
+    if (hsm_exists) {
+        for (unsigned int i = 0; i < CONFIG_MAX_NUM_NODES; ++i) {
+            unsigned int h = i + CONFIG_FIRST_HART_ID;
+            if (h != hart_id) {
+                sbi_hart_start(h, secondary_harts, h);
+            }
         }
     }
 
