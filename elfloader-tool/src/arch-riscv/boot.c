@@ -125,34 +125,6 @@ static void map_kernel_window(struct image_info *kernel_info)
     }
 }
 
-int hsm_exists = 0; /* assembly startup code will initialise this */
-
-#if CONFIG_MAX_NUM_NODES > 1
-
-extern void secondary_harts(word_t hart_id, word_t core_id);
-
-int secondary_go = 0;
-int next_logical_core_id = 1; /* incremented by assembly code  */
-int mutex = 0;
-int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
-static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
-{
-    /* Acquire lock to update core ready array */
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
-    core_ready[core_id] = 1;
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
-
-    /* Wait until all cores are go */
-    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (__atomic_load_n(&core_ready[i], __ATOMIC_ACQUIRE) == 0) {
-            /* busy waiting loop */
-        }
-    }
-}
-
-#endif /* CONFIG_MAX_NUM_NODES > 1 */
-
 static inline void sfence_vma(void)
 {
     asm volatile("sfence.vma" ::: "memory");
@@ -186,6 +158,69 @@ static inline void enable_virtual_memory(void)
     ifence();
 }
 
+int hsm_exists = 0; /* assembly startup code will initialise this */
+
+#if CONFIG_MAX_NUM_NODES > 1
+
+extern void secondary_harts(word_t hart_id, word_t core_id);
+
+int secondary_go = 0;
+int next_logical_core_id = 1; /* incremented by assembly code  */
+int mutex = 0;
+int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
+
+static void acquire_multicore_lock(void)
+{
+    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0) {
+        /* busy waiting loop */
+    }
+}
+
+static void release_multicore_lock(void)
+{
+    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
+}
+
+static void set_secondary_cores_go(void)
+{
+    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
+}
+
+static void block_until_secondary_cores_go(void)
+{
+    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) {
+        /* busy waiting loop */
+    }
+}
+
+static void set_core_ready(int core_id)
+{
+    /* call should hold the multicore lock here */
+    core_ready[core_id] = 1;
+}
+
+static int is_core_ready(int core_id)
+{
+    return (0 == __atomic_load_n(&core_ready[core_id], __ATOMIC_ACQUIRE));
+}
+
+static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
+{
+    acquire_multicore_lock();
+    printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
+    set_core_ready(core_id);
+    release_multicore_lock();
+
+    /* Wait until all cores are go */
+    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
+        while (!is_core_ready(i)) {
+            /* busy waiting loop */
+        }
+    }
+}
+
+#endif /* CONFIG_MAX_NUM_NODES > 1 */
+
 static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 {
     int ret;
@@ -209,16 +244,16 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     map_kernel_window(&kernel_info);
 
 #if CONFIG_MAX_NUM_NODES > 1
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
+    acquire_multicore_lock();
     printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
+    release_multicore_lock();
 
     /* If we have an SBI with HSM, then secondary cores should not be running
      * here at all. We will start them and then they are synchronized on this
      * signal. For an older SBI, the cores  might be running, but we have
      * stopped them and they will also synchronize on this signal.
      */
-    __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
+    set_secondary_cores_go();
 
     /* If SBI implements HSM, then use it to start the other cores. Otherwise
      * all we can do here is hope they have been started somehow and report
@@ -258,12 +293,12 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 
 void secondary_entry(word_t hart_id, word_t core_id)
 {
-    while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) ;
+    block_until_secondary_cores_go();
 
-    while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
+    acquire_multicore_lock();
     printf("Secondary entry hart_id:%"PRIu_word" core_id:%"PRIu_word"\n",
            hart_id, core_id);
-    __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
+    release_multicore_lock();
 
     set_and_wait_for_ready(hart_id, core_id);
 
