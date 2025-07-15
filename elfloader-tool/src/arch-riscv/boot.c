@@ -158,6 +158,39 @@ static inline void enable_virtual_memory(void)
     ifence();
 }
 
+static NORETURN void handover_to_next_boot_stage(word_t hart_id, word_t core_id)
+{
+    /* log state infos on pimary core only */
+    if (0 == core_id) {
+        printf("Enabling MMU and paging\n");
+    }
+
+    enable_virtual_memory();
+
+    if (0 == core_id) {
+        printf("Jumping to kernel-image entry point...\n\n");
+    }
+
+    /* This is not supposed to return. Adding or modifying these parameters
+     * required updating the registers in the nex't boot stage also, see head.S
+     * from the seL4 kernel sources.
+     */
+    ((init_riscv_kernel_t)kernel_info.virt_entry)(
+        user_info.phys_region_start,
+        user_info.phys_region_end,
+        user_info.phys_virt_offset,
+        user_info.virt_entry,
+        (word_t)dtb,
+        dtb_size,
+        hart_id,
+        core_id);
+
+    /* We should never get here. */
+    printf("ERROR: ELF-loader didn't hand over control\n");
+    abort();
+    UNREACHABLE();
+}
+
 int hsm_exists = 0; /* assembly startup code will initialise this */
 
 #if CONFIG_MAX_NUM_NODES > 1
@@ -271,22 +304,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     set_and_wait_for_ready(hart_id, 0);
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
 
-    printf("Enabling MMU and paging\n");
-    enable_virtual_memory();
-
-    printf("Jumping to kernel-image entry point...\n\n");
-    ((init_riscv_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
-                                                  user_info.phys_region_end,
-                                                  user_info.phys_virt_offset,
-                                                  user_info.virt_entry,
-                                                  (word_t)dtb,
-                                                  dtb_size,
-                                                  hart_id,
-                                                  0);
-
-    /* We should never get here. */
-    printf("ERROR: Kernel returned back to the ELF Loader\n");
-    return -1;
+    return 0;
 }
 
 #if CONFIG_MAX_NUM_NODES > 1
@@ -302,20 +320,9 @@ void secondary_entry(word_t hart_id, word_t core_id)
 
     set_and_wait_for_ready(hart_id, core_id);
 
-    enable_virtual_memory();
-
-
-    /* If adding or modifying these parameters you will need to update
-        the registers in head.S */
-    ((init_riscv_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
-                                                  user_info.phys_region_end,
-                                                  user_info.phys_virt_offset,
-                                                  user_info.virt_entry,
-                                                  (word_t)dtb,
-                                                  dtb_size,
-                                                  hart_id,
-                                                  core_id
-                                                 );
+    /* This will not return. */
+    handover_to_next_boot_stage(hart_id, core_id);
+    UNREACHABLE();
 }
 
 #endif /* CONFIG_MAX_NUM_NODES > 1 */
@@ -328,10 +335,7 @@ void main(word_t hart_id, void *bootloader_dtb)
 
     printf("  paddr=[%p..%p]\n", _text, (uintptr_t)_end - 1);
 
-    /* Run the actual ELF loader, which loads the ELF images, creates the MMU
-     * tables and enables the MMU. This is not expected to return unless there
-     * was an error.
-     */
+    /* Run the actual ELF loader: load ELF images, create MMU tables. */
     int ret = run_elfloader(hart_id, bootloader_dtb);
     if (0 != ret) {
         printf("ERROR: ELF-loader failed, code %d\n", ret);
@@ -340,8 +344,7 @@ void main(word_t hart_id, void *bootloader_dtb)
         UNREACHABLE();
     }
 
-    /* We should never get here. */
-    printf("ERROR: ELF-loader didn't hand over control\n");
-    abort();
+    /* This will not return. */
+    handover_to_next_boot_stage(hart_id, 0);
     UNREACHABLE();
 }
