@@ -21,42 +21,47 @@
 #define PT_LEVEL_1_BITS 30
 #if __riscv_xlen == 32
 #define PT_LEVEL_2_BITS 22
-#else
+#elif __riscv_xlen == 64
 #define PT_LEVEL_2_BITS 21
+#else
+#error "unsupported RISC-V architecture"
 #endif
 
-#define PTE_TYPE_TABLE 0x00
-#define PTE_TYPE_SRWX 0xCE
+
+#define PTE_TYPE_TABLE  WORD_CONST(0x00)
+#define PTE_TYPE_SRWX   WORD_CONST(0xCE)
 
 #define RISCV_PGSHIFT 12
 #define RISCV_PGSIZE BIT(RISCV_PGSHIFT)
 
 // page table entry (PTE) field
-#define PTE_V     0x001 // Valid
+#define PTE_V            WORD_CONST(0x001) // Valid
 
 #define PTE_PPN0_SHIFT 10
 
 #if __riscv_xlen == 32
 #define PT_INDEX_BITS  10
-#else
+#elif __riscv_xlen == 64
 #define PT_INDEX_BITS  9
+#else
+#error "unsupported RISC-V architecture"
 #endif
 
 #define PTES_PER_PT BIT(PT_INDEX_BITS)
 
-#define PTE_CREATE_PPN(PT_BASE)  (unsigned long)(((PT_BASE) >> RISCV_PGSHIFT) << PTE_PPN0_SHIFT)
-#define PTE_CREATE_NEXT(PT_BASE) (unsigned long)(PTE_CREATE_PPN(PT_BASE) | PTE_TYPE_TABLE | PTE_V)
-#define PTE_CREATE_LEAF(PT_BASE) (unsigned long)(PTE_CREATE_PPN(PT_BASE) | PTE_TYPE_SRWX | PTE_V)
+#define PTE_CREATE_PPN(PT_BASE)  (( ((word_t)(PT_BASE)) >> RISCV_PGSHIFT) << PTE_PPN0_SHIFT)
+#define PTE_CREATE_NEXT(PT_BASE) (PTE_CREATE_PPN(PT_BASE) | PTE_TYPE_TABLE | PTE_V)
+#define PTE_CREATE_LEAF(PT_BASE) (PTE_CREATE_PPN(PT_BASE) | PTE_TYPE_SRWX | PTE_V)
 
 #define GET_PT_INDEX(addr, n) (((addr) >> (((PT_INDEX_BITS) * ((CONFIG_PT_LEVELS) - (n))) + RISCV_PGSHIFT)) % PTES_PER_PT)
 
 struct image_info kernel_info;
 struct image_info user_info;
 
-unsigned long l1pt[PTES_PER_PT] __attribute__((aligned(4096)));
+word_t l1pt[PTES_PER_PT] __attribute__((aligned(4096)));
 #if __riscv_xlen == 64
-unsigned long l2pt[PTES_PER_PT] __attribute__((aligned(4096)));
-unsigned long l2pt_elf[PTES_PER_PT] __attribute__((aligned(4096)));
+word_t l2pt[PTES_PER_PT] __attribute__((aligned(4096)));
+word_t l2pt_elf[PTES_PER_PT] __attribute__((aligned(4096)));
 #endif
 
 /* first HART will initialise these */
@@ -84,8 +89,8 @@ void NORETURN abort(void)
 
 static int map_kernel_window(struct image_info *kernel_info)
 {
-    uint32_t index;
-    unsigned long *lpt;
+    unsigned int index;
+    word_t *lpt;
 
     /* Map the elfloader into the new address space */
 
@@ -123,11 +128,11 @@ static int map_kernel_window(struct image_info *kernel_info)
 }
 
 #if CONFIG_PT_LEVELS == 2
-uint64_t vm_mode = 0x1llu << 31;
+word_t vm_mode = WORD_CONST(0x1) << 31;
 #elif CONFIG_PT_LEVELS == 3
-uint64_t vm_mode = 0x8llu << 60;
+word_t vm_mode = WORD_CONST(0x8) << 60;
 #elif CONFIG_PT_LEVELS == 4
-uint64_t vm_mode = 0x9llu << 60;
+word_t vm_mode = WORD_CONST(0x9) << 60;
 #else
 #error "Wrong PT level"
 #endif
@@ -136,17 +141,17 @@ int hsm_exists = 0;
 
 #if CONFIG_MAX_NUM_NODES > 1
 
-extern void secondary_harts(unsigned long);
+extern void secondary_harts(word_t hart_id, word_t core_id);
 
 int secondary_go = 0;
 int next_logical_core_id = 1;
 int mutex = 0;
 int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
-static void set_and_wait_for_ready(int hart_id, int core_id)
+static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
 {
     /* Acquire lock to update core ready array */
     while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Hart ID %d core ID %d\n", hart_id, core_id);
+    printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
     core_ready[core_id] = 1;
     __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 
@@ -179,7 +184,7 @@ static inline void enable_virtual_memory(void)
     ifence();
 }
 
-static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
+static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
 {
     int ret;
 
@@ -206,15 +211,15 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
 
 #if CONFIG_MAX_NUM_NODES > 1
     while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Main entry hart_id:%d\n", hart_id);
+    printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
     __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 
     /* Unleash secondary cores */
     __atomic_store_n(&secondary_go, 1, __ATOMIC_RELEASE);
 
     /* Start all other cores */
-    for (int i = 0; i < CONFIG_MAX_NUM_NODES && hsm_exists; ++i) {
-        int h = i + CONFIG_FIRST_HART_ID;
+    for (unsigned int i = 0; i < CONFIG_MAX_NUM_NODES && hsm_exists; ++i) {
+        unsigned int h = i + CONFIG_FIRST_HART_ID;
         if (h != hart_id) {
             sbi_hart_start(h, secondary_harts, h);
         }
@@ -243,12 +248,13 @@ static int run_elfloader(UNUSED int hart_id, void *bootloader_dtb)
 
 #if CONFIG_MAX_NUM_NODES > 1
 
-void secondary_entry(int hart_id, int core_id)
+void secondary_entry(word_t hart_id, word_t core_id)
 {
     while (__atomic_load_n(&secondary_go, __ATOMIC_ACQUIRE) == 0) ;
 
     while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
-    printf("Secondary entry hart_id:%d core_id:%d\n", hart_id, core_id);
+    printf("Secondary entry hart_id:%"PRIu_word" core_id:%"PRIu_word"\n",
+           hart_id, core_id);
     __atomic_store_n(&mutex, 0, __ATOMIC_RELEASE);
 
     set_and_wait_for_ready(hart_id, core_id);
@@ -271,11 +277,11 @@ void secondary_entry(int hart_id, int core_id)
 
 #endif
 
-void main(int hart_id, void *bootloader_dtb)
+void main(word_t hart_id, void *bootloader_dtb)
 {
     /* Printing uses SBI, so there is no need to initialize any UART. */
-    printf("ELF-loader started on (HART %d) (NODES %d)\n",
-           hart_id, CONFIG_MAX_NUM_NODES);
+    printf("ELF-loader started on (HART %"PRIu_word") (NODES %u)\n",
+           hart_id, (unsigned int)CONFIG_MAX_NUM_NODES);
 
     printf("  paddr=[%p..%p]\n", _text, (uintptr_t)_end - 1);
 
