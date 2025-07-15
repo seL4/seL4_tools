@@ -158,6 +158,31 @@ static inline void enable_virtual_memory(void)
     ifence();
 }
 
+static int run_elfloader(void *bootloader_dtb)
+{
+    int ret;
+
+    /* Unpack ELF images into memory. */
+    unsigned int num_apps = 0;
+    ret = load_images(&kernel_info, &user_info, 1, &num_apps,
+                      bootloader_dtb, &dtb, &dtb_size);
+    if (0 != ret) {
+        printf("ERROR: image loading failed, code %d\n", ret);
+        return -1;
+    }
+
+    if (num_apps != 1) {
+        printf("ERROR: expected to load just 1 app, actually loaded %u apps\n",
+               num_apps);
+        return -1;
+    }
+
+    /* Create MMU tables, but don't enable MMU yet. */
+    map_kernel_window(&kernel_info);
+
+    return 0;
+}
+
 static NORETURN void handover_to_next_boot_stage(word_t hart_id, word_t core_id)
 {
     /* log state infos on pimary core only */
@@ -252,31 +277,8 @@ static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
     }
 }
 
-#endif /* CONFIG_MAX_NUM_NODES > 1 */
-
-static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
+static void smp_init(word_t hart_id)
 {
-    int ret;
-
-    /* Unpack ELF images into memory. */
-    unsigned int num_apps = 0;
-    ret = load_images(&kernel_info, &user_info, 1, &num_apps,
-                      bootloader_dtb, &dtb, &dtb_size);
-    if (0 != ret) {
-        printf("ERROR: image loading failed, code %d\n", ret);
-        return -1;
-    }
-
-    if (num_apps != 1) {
-        printf("ERROR: expected to load just 1 app, actually loaded %u apps\n",
-               num_apps);
-        return -1;
-    }
-
-    /* Create MMU tables, but don't enable MMU yet. */
-    map_kernel_window(&kernel_info);
-
-#if CONFIG_MAX_NUM_NODES > 1
     acquire_multicore_lock();
     printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
     release_multicore_lock();
@@ -302,12 +304,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
     set_and_wait_for_ready(hart_id, 0);
-#endif /* CONFIG_MAX_NUM_NODES > 1 */
-
-    return 0;
 }
-
-#if CONFIG_MAX_NUM_NODES > 1
 
 void secondary_entry(word_t hart_id, word_t core_id)
 {
@@ -336,13 +333,17 @@ void main(word_t hart_id, void *bootloader_dtb)
     printf("  paddr=[%p..%p]\n", _text, (uintptr_t)_end - 1);
 
     /* Run the actual ELF loader: load ELF images, create MMU tables. */
-    int ret = run_elfloader(hart_id, bootloader_dtb);
+    int ret = run_elfloader(bootloader_dtb);
     if (0 != ret) {
         printf("ERROR: ELF-loader failed, code %d\n", ret);
         /* There is nothing we can do to recover. */
         abort();
         UNREACHABLE();
     }
+
+#if CONFIG_MAX_NUM_NODES > 1
+    smp_init(hart_id);
+#endif
 
     /* This will not return. */
     handover_to_next_boot_stage(hart_id, 0);
