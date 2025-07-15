@@ -87,7 +87,7 @@ void NORETURN abort(void)
     UNREACHABLE();
 }
 
-static int map_kernel_window(struct image_info *kernel_info)
+static void map_kernel_window(struct image_info *kernel_info)
 {
     unsigned int index;
     word_t *lpt;
@@ -123,8 +123,6 @@ static int map_kernel_window(struct image_info *kernel_info)
         lpt[index] = PTE_CREATE_LEAF(ROUND_DOWN(kernel_info->phys_region_start, PT_LEVEL_2_BITS) +
                                      (page << PT_LEVEL_2_BITS));
     }
-
-    return 0;
 }
 
 int hsm_exists = 0; /* assembly startup code will initialise this */
@@ -208,11 +206,7 @@ static int run_elfloader(UNUSED word_t hart_id, void *bootloader_dtb)
     }
 
     /* Create MMU tables, but don't enable MMU yet. */
-    ret = map_kernel_window(&kernel_info);
-    if (0 != ret) {
-        printf("ERROR: could not map kernel window, code %d\n", ret);
-        return -1;
-    }
+    map_kernel_window(&kernel_info);
 
 #if CONFIG_MAX_NUM_NODES > 1
     while (__atomic_exchange_n(&mutex, 1, __ATOMIC_ACQUIRE) != 0);
