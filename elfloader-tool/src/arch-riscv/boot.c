@@ -225,7 +225,7 @@ extern void secondary_harts(word_t hart_id, word_t core_id);
 int secondary_go = 0;
 int next_logical_core_id = 1; /* incremented by assembly code  */
 int mutex = 0;
-int core_ready[CONFIG_MAX_NUM_NODES] = { 0 };
+int core_info[CONFIG_MAX_NUM_NODES] = { 0 };
 
 static void acquire_multicore_lock(void)
 {
@@ -251,27 +251,27 @@ static void block_until_secondary_cores_go(void)
     }
 }
 
-static void set_core_ready(int core_id)
+static void set_core_info(int hart_id, int core_id)
 {
     /* call should hold the multicore lock here */
-    core_ready[core_id] = 1;
+    core_info[core_id] = BIT(31) | hart_id;
 }
 
-static int is_core_ready(int core_id)
+static int get_core_info(int core_id)
 {
-    return (0 == __atomic_load_n(&core_ready[core_id], __ATOMIC_ACQUIRE));
+    return __atomic_load_n(&core_info[core_id], __ATOMIC_ACQUIRE);
 }
 
 static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
 {
     acquire_multicore_lock();
     printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
-    set_core_ready(core_id);
+    set_core_info(hart_id, core_id);
     release_multicore_lock();
 
     /* Wait until all cores are go */
     for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (!is_core_ready(i)) {
+        while (0 == get_core_info(i)) {
             /* busy waiting loop */
         }
     }
