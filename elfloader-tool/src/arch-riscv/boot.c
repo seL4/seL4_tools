@@ -262,27 +262,8 @@ static int get_core_info(int core_id)
     return __atomic_load_n(&core_info[core_id], __ATOMIC_ACQUIRE);
 }
 
-static void set_and_wait_for_ready(word_t hart_id, word_t core_id)
+static word_t smp_init(word_t hart_id)
 {
-    acquire_multicore_lock();
-    printf("Hart ID %"PRIu_word" core ID %"PRIu_word"\n", hart_id, core_id);
-    set_core_info(hart_id, core_id);
-    release_multicore_lock();
-
-    /* Wait until all cores are go */
-    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
-        while (0 == get_core_info(i)) {
-            /* busy waiting loop */
-        }
-    }
-}
-
-static void smp_init(word_t hart_id)
-{
-    acquire_multicore_lock();
-    printf("Main entry hart_id:%"PRIu_word"\n", hart_id);
-    release_multicore_lock();
-
     /* If we have an SBI with HSM, then secondary cores should not be running
      * here at all. We will start them and then they are synchronized on this
      * signal. For an older SBI, the cores  might be running, but we have
@@ -303,7 +284,36 @@ static void smp_init(word_t hart_id)
         }
     }
 
-    set_and_wait_for_ready(hart_id, 0);
+    /* We are core 0, but this might be just from the random boot order. Check
+     * all other cores that have come up to ensure CONFIG_FIRST_HART_ID will be
+     * core 0 when we enter the next boot stage.
+     */
+    word_t core_id = 0;
+    for (int i = 1; i < CONFIG_MAX_NUM_NODES; i++) {
+        /* wait for core to be ready */
+        int info;
+        do {
+            info = get_core_info(i);
+        } while (0 == info);
+        /* Check if this is the designated primary core. If so, put our
+         * hart ID into this slot, and once we are done with the loop give
+         * our slot 0 to this core
+         */
+        if (CONFIG_FIRST_HART_ID == (info & 0x7fffffff)) {
+            set_core_info(hart_id, i); /* put us in the other slot */
+            core_id = i; /* we are no longer core 0 */
+            acquire_multicore_lock();
+            printf("becomming secondary core: hart ID %"PRIu_word"\n", hart_id);
+            release_multicore_lock();
+        }
+    }
+
+    /* All other cores are still waiting for the designated primary core,
+     * set its info now to unblock then.
+     */
+    set_core_info(CONFIG_FIRST_HART_ID, 0);
+
+    return core_id;
 }
 
 void secondary_entry(word_t hart_id, word_t core_id)
@@ -313,9 +323,26 @@ void secondary_entry(word_t hart_id, word_t core_id)
     acquire_multicore_lock();
     printf("Secondary entry hart_id:%"PRIu_word" core_id:%"PRIu_word"\n",
            hart_id, core_id);
+    set_core_info(hart_id, core_id);
     release_multicore_lock();
 
-    set_and_wait_for_ready(hart_id, core_id);
+    /* Wait for all other cores to finish. */
+    for (int i = 0; i < CONFIG_MAX_NUM_NODES; i++) {
+        while (0 == get_core_info(i)) {
+            /* busy waiting loop */
+        }
+    }
+
+    /* Check if we are the primary core for the next stage. If so, things have
+     * already been updated by the old primary core, and we can just start
+     * using the core ID 0 from now on.
+     */
+    if (hart_id == CONFIG_FIRST_HART_ID) {
+        acquire_multicore_lock();
+        printf("Becomming primary core: hart_id:%"PRIu_word"\n", hart_id);
+        release_multicore_lock();
+        core_id = 0;
+    }
 
     /* This will not return. */
     handover_to_next_boot_stage(hart_id, core_id);
@@ -342,10 +369,12 @@ void main(word_t hart_id, void *bootloader_dtb)
     }
 
 #if CONFIG_MAX_NUM_NODES > 1
-    smp_init(hart_id);
+    word_t core_id = smp_init(hart_id);
+#else
+    word_t core_id = 0;
 #endif
 
     /* This will not return. */
-    handover_to_next_boot_stage(hart_id, 0);
+    handover_to_next_boot_stage(hart_id, core_id);
     UNREACHABLE();
 }
