@@ -30,29 +30,51 @@
     a0;                         \
 })
 
-#define  SBI_HSM                WORD_CONST(0x48534D)
-#define  SBI_HSM_HART_START     WORD_CONST(0)
-
-#define SBI_EXT_CALL(extension, which, arg0, arg1, arg2) ({  \
-    register word_t a0 asm ("a0") = (word_t)(arg0);   \
-    register word_t a1 asm ("a1") = (word_t)(arg1);   \
-    register word_t a2 asm ("a2") = (word_t)(arg2);   \
-    register word_t a6 asm ("a6") = (word_t)(which);  \
-    register word_t a7 asm ("a7") = (word_t)(extension); \
-    asm volatile ("ecall"                   \
-              : "+r" (a0), "+r" (a1)        \
-              : "r" (a2), "r" (a6), "r" (a7)\
-              : "memory");              \
-    a0;                         \
-})
-
-#define SBI_HSM_CALL(which, arg0, arg1, arg2) \
-    SBI_EXT_CALL(SBI_HSM, (which), (arg0), (arg1), (arg2))
-
 /* Lazy implementations until SBI is finalized */
 #define SBI_CALL_0(which) SBI_CALL(which, 0, 0, 0)
 #define SBI_CALL_1(which, arg0) SBI_CALL(which, arg0, 0, 0)
 #define SBI_CALL_2(which, arg0, arg1) SBI_CALL(which, arg0, arg1, 0)
+
+
+typedef enum {
+    SBI_SUCCESS                 = 0,
+    SBI_ERR_FAILED              = -1,
+    SBI_ERR_NOT_SUPPORTED       = -2,
+    SBI_ERR_INVALID_PARAM       = -3,
+    SBI_ERR_DENIED              = -4,
+    SBI_ERR_INVALID_ADDRESS     = -5,
+    SBI_ERR_ALREADY_AVAILABLE   = -6,
+    SBI_ERR_ALREADY_STARTED     = -7,
+    SBI_ERR_ALREADY_STOPPED     = -8
+} sbi_call_ret_t;
+
+#define SBI_CALL_EXT(extension, which, arg0, arg1, arg2, ret) \
+    do {  \
+        register word_t a0 asm ("a0") = (word_t)(arg0); \
+        register word_t a1 asm ("a1") = (word_t)(arg1); \
+        register word_t a2 asm ("a2") = (word_t)(arg2); \
+        register word_t a6 asm ("a6") = (word_t)(which); \
+        register word_t a7 asm ("a7") = (word_t)(extension); \
+        asm volatile ("ecall" \
+                : "+r" (a0), "+r" (a1) \
+                : "r" (a2), "r" (a6), "r" (a7) \
+                : "memory"); \
+        (ret).code = a0; \
+        (ret).data = a1; \
+    } while(0)
+
+typedef struct {
+    sbi_call_ret_t code;
+    word_t data;
+} sbi_ret_t;
+
+#define  SBI_HSM                WORD_CONST(0x48534D)
+#define  SBI_HSM_HART_START     WORD_CONST(0)
+
+typedef void (*sbi_hart_entry_func)(word_t hart_id, word_t arg);
+
+#define SBI_HSM_CALL(which, arg0, arg1, arg2, ret) \
+    SBI_CALL_EXT(SBI_HSM, (which), (arg0), (arg1), (arg2), ret)
 
 static inline void sbi_console_putchar(int ch)
 {
@@ -111,9 +133,11 @@ static inline void sbi_remote_sfence_vma_asid(const word_t *hart_mask,
     SBI_CALL_1(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask);
 }
 
-static inline void sbi_hart_start(const word_t hart_id,
-                                  void (*start)(word_t),
-                                  word_t privilege)
+static inline sbi_ret_t sbi_hart_start(const word_t hart_id,
+                                       sbi_hart_entry_func entry,
+                                       word_t arg)
 {
-    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, start, privilege);
+    sbi_ret_t ret = { 0 };
+    SBI_HSM_CALL(SBI_HSM_HART_START, hart_id, entry, arg, ret);
+    return ret;
 }
