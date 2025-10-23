@@ -21,11 +21,11 @@
 #define PSCI_METHOD_SMC             1
 #define PSCI_METHOD_HVC             2
 
-int psci_version(void);
-int psci_cpu_suspend(int power_state, unsigned long entry_point,
+int psci_version(unsigned int method);
+int psci_cpu_suspend(unsigned int method, int power_state, unsigned long entry_point,
                      unsigned long context_id);
 /* this function does not return when successful */
-int psci_cpu_off(void);
-int psci_cpu_on(unsigned long target_cpu, unsigned long entry_point,
+int psci_cpu_off(unsigned int method);
+int psci_cpu_on(unsigned int method, unsigned long target_cpu, unsigned long entry_point,
                 unsigned long context_id);
-int psci_system_reset(void);
+int psci_system_reset(unsigned int method);
