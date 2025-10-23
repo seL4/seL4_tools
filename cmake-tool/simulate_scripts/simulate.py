@@ -23,6 +23,8 @@ def parse_args():
                         help="QEMU CPU", default="@QEMU_SIM_CPU@")
     parser.add_argument('-o', '--cpu-opt', dest='qemu_sim_cpu_opt', type=str,
                         help="QEMU CPU Options", default="@QEMU_SIM_CPU_OPT@")
+    parser.add_argument('--smp', dest='qemu_sim_smp', type=str,
+                        help="QEMU SMP", default="@QEMU_SIM_SMP@")
     parser.add_argument('-g', '--graphic', dest='qemu_sim_graphic_opt', type=str,
                         help="QEMU Graphic Options", default="@QEMU_SIM_GRAPHIC_OPT@")
     parser.add_argument('-s', '--serial', dest='qemu_sim_serial_opt', type=str,
@@ -79,7 +81,11 @@ if __name__ == "__main__":
 
     qemu_sim_mem_size_entry = "-m size=" + args.qemu_sim_mem_size
 
-    qemu_simulate_command_opts = [args.qemu_sim_binary, qemu_sim_machine_entry, qemu_sim_cpu_entry, args.qemu_sim_graphic_opt,
+    qemu_sim_smp_entry = ""
+    if args.qemu_sim_smp:
+        qemu_sim_smp_entry = "-smp " + args.qemu_sim_smp
+
+    qemu_simulate_command_opts = [args.qemu_sim_binary, qemu_sim_machine_entry, qemu_sim_cpu_entry, qemu_sim_smp_entry, args.qemu_sim_graphic_opt,
                                   args.qemu_sim_serial_opt, qemu_sim_mem_size_entry, args.qemu_sim_extra_args, qemu_sim_images_entry,
                                   qemu_gdbserver_command]
     qemu_simulate_command = " ".join(qemu_simulate_command_opts)
