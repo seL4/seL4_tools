@@ -34,12 +34,7 @@ int psci_func(unsigned int method, unsigned int id, unsigned long param1,
               unsigned long param2, unsigned long param3)
 {
     if (method == PSCI_METHOD_HVC) {
-#ifdef CONFIG_ARCH_AARCH64
         return psci_hvc_func(id, param1, param2, param3);
-#else
-        printf("ERROR: HVC PSCI method is only supported on 64-bit ARM\n");
-        return -1;
-#endif
     } else if (method == PSCI_METHOD_SMC) {
         return psci_smc_func(id, param1, param2, param3);
     } else {

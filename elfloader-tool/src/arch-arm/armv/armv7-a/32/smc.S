@@ -24,4 +24,10 @@ BEGIN_FUNC(psci_smc_func)
     ldmfd    sp!, {r3-r11, pc}
 END_FUNC(psci_smc_func)
 
-
+BEGIN_FUNC(psci_hvc_func)
+    .arch_extension sec
+    stmfd    sp!, {r3-r11, lr}
+    dsb
+    hvc #0
+    ldmfd    sp!, {r3-r11, pc}
+END_FUNC(psci_hvc_func)
