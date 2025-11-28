@@ -9,7 +9,12 @@
 
 .text
 
-BEGIN_FUNC(psci_func)
+BEGIN_FUNC(psci_smc_func)
     smc #0
     ret
-END_FUNC(psci_func)
+END_FUNC(psci_smc_func)
+
+BEGIN_FUNC(psci_hvc_func)
+    hvc #0
+    ret
+END_FUNC(psci_hvc_func)
