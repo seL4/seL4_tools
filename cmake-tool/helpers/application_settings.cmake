@@ -14,7 +14,7 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         "tx1;hikey;odroidc2;odroidc4;imx8mq-evk;imx8mm-evk;imx8mp-evk;hifive;bcm2837;tqma8xqp1gb;imx93;bcm2711;rocketchip;star64;rk3568"
     )
     set(efi_list "tk1;rockpro64;quartz64")
-    set(uimage_list "hifive-p550;tx2;am335x")
+    set(uimage_list "hifive-p550;tx2;am335x;bananapi-f3")
     if(${kernel_platform} IN_LIST efi_list OR (${kernel_platform} STREQUAL "hikey"
                                                AND ${kernel_sel4_arch} STREQUAL "aarch64")
     )
@@ -128,6 +128,12 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         )
     endif()
     if(KernelPlatformHifiveP550)
+        set(UseRiscVOpenSBI
+            OFF
+            CACHE BOOL "" FORCE
+        )
+    endif()
+    if(KernelPlatformBananapiF3)
         set(UseRiscVOpenSBI
             OFF
             CACHE BOOL "" FORCE
