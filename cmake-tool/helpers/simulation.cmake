@@ -57,6 +57,7 @@ function(GenerateSimulateScript)
     set(sim_cpu_opt "")
     set(sim_machine "")
     set(qemu_sim_extra_args "")
+    set(sim_smp "${KernelMaxNumNodes}")
     if(KernelArchX86)
         # Try and simulate the correct micro architecture and features
         if(KernelX86MicroArchNehalem)
@@ -202,7 +203,7 @@ function(GenerateSimulateScript)
             COMMAND
                 ${CMAKE_COMMAND} -DCONFIGURE_INPUT_FILE=${SIMULATE_SCRIPT}
                 -DCONFIGURE_OUTPUT_FILE=${sim_path} -DQEMU_SIM_BINARY=${QemuBinaryMachine}
-                -DQEMU_SIM_CPU=${sim_cpu} -DQEMU_SIM_MACHINE=${sim_machine}
+                -DQEMU_SIM_CPU=${sim_cpu} -DQEMU_SIM_SMP=${sim_smp} -DQEMU_SIM_MACHINE=${sim_machine}
                 -DQEMU_SIM_CPU_OPT=${sim_cpu_opt} -DQEMU_SIM_GRAPHIC_OPT=${sim_graphic_opt}
                 -DQEMU_SIM_SERIAL_OPT=${sim_serial_opt} -DQEMU_SIM_MEM_SIZE_OPT=${QemuMemSize}
                 -DQEMU_SIM_KERNEL_FILE=${KERNEL_IMAGE_NAME} -DQEMU_SIM_INITRD_FILE=${IMAGE_NAME}
