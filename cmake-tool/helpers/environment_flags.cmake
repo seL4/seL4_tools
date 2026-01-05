@@ -12,13 +12,17 @@ macro(add_default_compilation_options)
     include(${KERNEL_FLAGS_PATH})
 
     if(("${CMAKE_BUILD_TYPE}" STREQUAL "Release") OR ("${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel"))
-        option(UserLinkerGCSections "Perform dead code and data removal
+        option(
+            UserLinkerGCSections
+            "Perform dead code and data removal
             Build user level with -ffunction-sections and -fdata-sections and
             link with --gc-sections. The first two options place each function
             and data in a different section such that --gc-sections is able
             to effectively discard sections that are unused after a reachability
             analysis. This does not interact well with debug symbols generated
-            by -g and can in some cases result in larger object files and binaries" ON)
+            by -g and can in some cases result in larger object files and binaries"
+            ON
+        )
 
         if(UserLinkerGCSections)
             add_compile_options(-ffunction-sections -fdata-sections)
@@ -28,19 +32,23 @@ macro(add_default_compilation_options)
     mark_as_advanced(UserLinkerGCSections)
 
     add_compile_options(
-        -nostdinc
-        -fno-pic
-        -fno-pie
-        -fno-stack-protector
-        -fno-asynchronous-unwind-tables
+        -nostdinc -fno-pic -fno-pie -fno-stack-protector -fno-asynchronous-unwind-tables
         -ftls-model=local-exec
     )
+
+    if(NOT (("${CMAKE_BUILD_TYPE}" STREQUAL "Release") AND ("${CMAKE_BUILD_TYPE}" STREQUAL
+                                                            "MinSizeRel"))
+    )
+        add_compile_options(-O1)
+    endif()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -nostdinc++")
     set(CMAKE_C_STANDARD 11)
-    set(LinkPageSize "0x1000" CACHE STRING "Page size to be used for linker")
+    set(LinkPageSize
+        "0x1000"
+        CACHE STRING "Page size to be used for linker"
+    )
     mark_as_advanced(LinkPageSize)
-    set(
-        CMAKE_EXE_LINKER_FLAGS
+    set(CMAKE_EXE_LINKER_FLAGS
         "${CMAKE_EXE_LINKER_FLAGS} -static -nostdlib -z max-page-size=${LinkPageSize}"
     )
 
@@ -52,7 +60,7 @@ macro(add_default_compilation_options)
         # The arm-gnu-eabi* uses TPIDRURO as the default tls register.
         # If this isn't what the kernel is configured to, generate function calls for
         # thread pointer access.
-        if (NOT KernelArmTLSRegTPIDRURO)
+        if(NOT KernelArmTLSRegTPIDRURO)
             add_compile_options(-mtp=soft)
         endif()
     endif()
@@ -66,11 +74,10 @@ macro(add_default_compilation_options)
             message(FATAL_ERROR "CMAKE_C_COMPILER_VERSION is not set")
         endif()
         # special handling for GCC 10 and above
-        if(
-            ((CMAKE_C_COMPILER_ID STREQUAL "GNU")
-            AND (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "10.0.0"))
-            OR ((CMAKE_C_COMPILER_ID STREQUAL "Clang")
-            AND (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "12.0.0"))
+        if(((CMAKE_C_COMPILER_ID STREQUAL "GNU") AND (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL
+                                                      "10.0.0"))
+           OR ((CMAKE_C_COMPILER_ID STREQUAL "Clang") AND (CMAKE_C_COMPILER_VERSION
+                                                           VERSION_GREATER_EQUAL "12.0.0"))
         )
             add_compile_options(-mno-outline-atomics)
         endif()
@@ -123,8 +130,14 @@ macro(check_c_source_runs_cross_compile program var)
     # each time CMake is run.
     unset(${var} CACHE)
     # Set internal variables to avoid running the executable.
-    set(${var}_EXITCODE 0 CACHE INTERNAL "")
-    set(${var}_EXITCODE__TRYRUN_OUTPUT "" CACHE INTERNAL "")
+    set(${var}_EXITCODE
+        0
+        CACHE INTERNAL ""
+    )
+    set(${var}_EXITCODE__TRYRUN_OUTPUT
+        ""
+        CACHE INTERNAL ""
+    )
     # Save the current CMAKE_REQUIRED_QUIET setting in order
     # to set it to ON to suppress any output before restoring
     # it to its old value.
