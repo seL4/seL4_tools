@@ -63,7 +63,6 @@ void non_boot_main(void)
                                                 user_info.phys_region_end, user_info.phys_virt_offset,
                                                 user_info.virt_entry, (paddr_t)dtb, dtb_size);
 
-    printf("AP Kernel returned back to the elf-loader.\n");
     abort();
 }
 

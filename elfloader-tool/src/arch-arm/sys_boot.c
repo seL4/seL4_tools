@@ -215,7 +215,7 @@ void continue_boot(int was_relocated)
         printf("Enabling MMU and jumping to entry point...\n\n");
         arm_enable_mmu();
     }
-    /* Enter kernel. The UART is no longer be accessible here. */
+    /* Enter kernel. The UART is no longer accessible here. */
     ((init_arm_kernel_t)kernel_info.virt_entry)(user_info.phys_region_start,
                                                 user_info.phys_region_end,
                                                 user_info.phys_virt_offset,

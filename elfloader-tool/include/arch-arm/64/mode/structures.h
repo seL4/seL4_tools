@@ -31,4 +31,4 @@ extern uint64_t _boot_pmd_up[BIT(PMD_BITS)];
 
 extern uint64_t _boot_pgd_down[BIT(PGD_BITS)];
 extern uint64_t _boot_pud_down[BIT(PUD_BITS)];
-
+extern uint64_t _boot_pmd_down[BIT(PMD_BITS)];
