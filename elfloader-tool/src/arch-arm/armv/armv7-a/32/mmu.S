@@ -53,6 +53,9 @@ BEGIN_FUNC(arm_enable_mmu)
     bic     r1, r1, #(1 << 2)       /* Disable D-Cache */
     bic     r1, r1, #(1 << 0)       /* Disable MMU     */
     mcr     SCTLR(r1)
+     /* Make sure cache is disabled before stack gets modified */
+    dsb
+    isb
 
     /* invalidate caches. */
     bl      invalidate_dcache
