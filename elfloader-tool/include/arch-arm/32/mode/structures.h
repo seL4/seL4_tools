@@ -27,6 +27,7 @@
 #define HYP_PMD_SIZE_BITS     (HYP_PMD_BITS + HYP_PMDE_SIZE_BITS)
 
 #define GET_PT_INDEX(x)       (((x) >> (PAGE_BITS)) & MASK(PT_BITS))
+#define GET_PD_INDEX(x)       (((x) >> (PAGE_BITS + PT_BITS)) & MASK(PD_BITS))
 
 extern uint32_t _boot_pd[BIT(PD_BITS)];
 extern uint32_t _boot_pt[BIT(PT_BITS)];
