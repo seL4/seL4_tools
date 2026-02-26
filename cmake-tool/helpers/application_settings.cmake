@@ -112,6 +112,10 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
         )
     endif()
     if(KernelPlatformStar64)
+        set(UseRiscVOpenSBI
+            OFF
+            CACHE BOOL "" FORCE
+        )
         set(IMAGE_START_ADDR
             0x60000000
             CACHE INTERNAL "" FORCE
