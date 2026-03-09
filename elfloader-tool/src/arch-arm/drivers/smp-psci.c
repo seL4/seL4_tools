@@ -18,14 +18,10 @@ static int smp_psci_cpu_on(UNUSED struct elfloader_device *dev,
                            UNUSED struct elfloader_cpu *cpu, UNUSED void *entry, UNUSED void *stack)
 {
 #if CONFIG_MAX_NUM_NODES > 1
-    if (cpu->extra_data == PSCI_METHOD_HVC) {
-        printf("HVC is not supported for PSCI!\n");
-        return -1;
-    }
     secondary_data.entry = entry;
     secondary_data.stack = stack;
     dmb();
-    int ret = psci_cpu_on(cpu->cpu_id, (unsigned long)&secondary_startup, 0);
+    int ret = psci_cpu_on(cpu->extra_data, cpu->cpu_id, (unsigned long)&secondary_startup, 0);
     if (ret != PSCI_SUCCESS) {
         printf("Failed to bring up core 0x%x with error %d\n", cpu->cpu_id, ret);
         return -1;
