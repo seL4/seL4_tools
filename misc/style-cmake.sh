@@ -13,12 +13,13 @@ PROGNAME=${0##*/}
 # Pass the cmake format as args such that cmake-format.py can be used
 # to provide definitions for custom function formatting.
 CMAKE_FMT="--line-width 100 \
-           --tab-size 4 \
+           --tab-size 2 \
            --separate-ctrl-name-with-space False \
            --separate-fn-name-with-space False \
-           --dangle-parens True \
+           --dangle-parens False \
            --command-case unchanged \
            --keyword-case unchanged \
+           --max-subgroups-hwrap 10 \
            --enable-markup False"
 
 # cmake-format sends its version info to standard error.  :-/
