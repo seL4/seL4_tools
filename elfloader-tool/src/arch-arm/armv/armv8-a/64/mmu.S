@@ -9,11 +9,7 @@
 #include <assembler.h>
 #include <mode/assembler.h>
 
-#if CONFIG_MAX_NUM_NODES > 1
 #define TCR_ISH     TCR_SHARED
-#else
-#define TCR_ISH     0
-#endif
 
 .text
 
