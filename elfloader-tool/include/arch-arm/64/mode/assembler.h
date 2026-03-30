@@ -67,6 +67,13 @@
 #define MT_NORMAL_WT      5
 #define MAIR(_attr, _mt)  ((_attr) << ((_mt) * 8))
 
+/* DAIF register */
+#define DAIF_FIRQ               (1 << 6)
+#define DAIF_IRQ                (1 << 7)
+#define DAIF_SERROR             (1 << 8)
+#define DAIF_DEBUG              (1 << 9)
+#define DAIFSET_MASK            0xf
+
 .macro enable_mmu sctlr tmp
     mrs     \tmp, \sctlr
     orr     \tmp, \tmp, #(1 << 0)

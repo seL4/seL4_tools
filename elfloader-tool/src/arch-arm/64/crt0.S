@@ -11,11 +11,15 @@
 #endif
 
 #include <assembler.h>
+#include <mode/assembler.h>
 
 .extern main
 
 .section ".text.start"
 BEGIN_FUNC(_start)
+    /* Make sure interrupts are disabled */
+    msr daifset, #DAIFSET_MASK
+
     adrp    x19, core_stack_alloc
     add     x19, x19, #0xff0
     mov     sp, x19
@@ -64,6 +68,8 @@ END_FUNC(finish_relocation)
 
 /* secondary cpu startup */
 BEGIN_FUNC(secondary_startup)
+    /* Make sure interrupts are disabled */
+    msr daifset, #DAIFSET_MASK
     /*
      * secondary_data is a struct that looks like this:
      * 0x0 void *entry
