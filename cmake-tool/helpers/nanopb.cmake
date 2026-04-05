@@ -28,11 +28,6 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${NANOPB_SRC_ROOT_FOLDER}/extra/")
 find_package(Nanopb REQUIRED)
 
-# generate nanopb runtime library
-file(GLOB nanopb_src ${NANOPB_SRC_ROOT_FOLDER}/*.h ${NANOPB_SRC_ROOT_FOLDER}/*.c)
-
-add_library(nanopb STATIC EXCLUDE_FROM_ALL ${nanopb_src})
-target_include_directories(nanopb PUBLIC ${NANOPB_SRC_ROOT_FOLDER})
 target_link_libraries(nanopb muslc)
 
 # Treat the source diretory as immutable.
