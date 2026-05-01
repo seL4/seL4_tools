@@ -112,16 +112,20 @@ function(DeclareRootserver rootservername)
                 if(NOT OPENSBI_PLAT_ISA)
                     set(OPENSBI_PLAT_ISA "rv${OPENSBI_PLAT_XLEN}imafdc")
 
-                    # Determine if GNU toolchain is used and if yes,
-                    # whether GCC version >= 11.3 (implies binutils version >= 2.38)
-                    if(
-                        CMAKE_ASM_COMPILER_ID STREQUAL "GNU"
-                        AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "11.3"
+                    # OpenSBI is (currently)always built with gcc. When the rest
+                    # of the build is using clang, we still need to provide the
+                    # correct ISA flags below, so a pure CMAKE_C_COMPILER_VERSION
+                    # check is not sufficient.
+                    execute_process(
+                        COMMAND ${CROSS_COMPILER_PREFIX}gcc -dumpversion
+                        OUTPUT_VARIABLE OPENSBI_CROSS_GCC_VERSION
+                        OUTPUT_STRIP_TRAILING_WHITESPACE
                     )
-                        # Manually enable Zicsr and Zifencei extensions
-                        # This became necessary due to a change in the
-                        # default ISA version in GNU binutils 2.38 which
-                        # is the default binutils version shipped with GCC 11.3
+                    # Manually enable Zicsr and Zifencei extensions
+                    # This became necessary due to a change in the
+                    # default ISA version in GNU binutils 2.38 which
+                    # is the default binutils version shipped with GCC 11.3
+                    if(OPENSBI_CROSS_GCC_VERSION VERSION_GREATER_EQUAL "11.3")
                         string(APPEND OPENSBI_PLAT_ISA "_zicsr_zifencei")
                     endif()
                 endif()
