@@ -220,6 +220,12 @@ int elf_getMemoryBounds(
     for (unsigned int i = 0; i < elf_getNumProgramHeaders(elfFile); i++) {
         uint64_t sect_min, sect_max;
 
+        /* Ignore non-loadable segments, they are either metadata or already
+           accounted for in PT_LOAD segments */
+        if (elf_getProgramHeaderType(elfFile, i) != PT_LOAD) {
+            continue;
+        }
+
         if (elf_getProgramHeaderMemorySize(elfFile, i) == 0) {
             continue;
         }
