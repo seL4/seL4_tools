@@ -50,7 +50,7 @@ SECTIONS
     {
         . = ALIGN(0x1000);
         core_stack_alloc = .;
-        . = . + CONFIG_MAX_NUM_NODES * 1 << 12;
+        . = . + CONFIG_MAX_NUM_NODES * (1 << 12);
         core_stack_alloc_end = .;
         _bss = .;
         *(.sbss*)
