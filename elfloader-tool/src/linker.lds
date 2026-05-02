@@ -59,4 +59,13 @@ SECTIONS
         _bss_end = .;
     }
      _end = .;
+
+    /* With lld on riscv32 a debug-only non-empty .eh_frame ends up ahead of
+      .start, and OpenSBI always jumps to the first address. We could place it
+      somewhere explicitly, but discarding it for elfloader is easier and safe
+      (application payload is unaffected). */
+    /DISCARD/ :
+    {
+        *(.eh_frame)
+    }
 }
