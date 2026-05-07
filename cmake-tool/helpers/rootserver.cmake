@@ -119,11 +119,14 @@ function(DeclareRootserver rootservername)
           COMMAND make -s -C "${OPENSBI_PATH}" O="${OPENSBI_BINARY_DIR}"
                   PLATFORM="${KernelOpenSBIPlatform}" clean
           COMMAND ${CMAKE_OBJCOPY} -O binary "${elf_target_file}" "${OPENSBI_PLAYLOAD}"
+          # pass -std=gnu17 to the OpenSBI build for gcc >=15, can be dopped
+          # when OpenSBI is bumped to >= 1.6
           COMMAND
             make -C "${OPENSBI_PATH}" O="${OPENSBI_BINARY_DIR}"
-            CROSS_COMPILE=${CROSS_COMPILER_PREFIX} PLATFORM="${KernelOpenSBIPlatform}"
-            PLATFORM_RISCV_XLEN=${OPENSBI_PLAT_XLEN} PLATFORM_RISCV_ISA=${OPENSBI_PLAT_ISA}
-            PLATFORM_RISCV_ABI=${OPENSBI_PLAT_ABI} FW_PAYLOAD_PATH="${OPENSBI_PLAYLOAD}"
+            CROSS_COMPILE=${CROSS_COMPILER_PREFIX} "CC=${CROSS_COMPILER_PREFIX}gcc -std=gnu17"
+            PLATFORM="${KernelOpenSBIPlatform}" PLATFORM_RISCV_XLEN=${OPENSBI_PLAT_XLEN}
+            PLATFORM_RISCV_ISA=${OPENSBI_PLAT_ISA} PLATFORM_RISCV_ABI=${OPENSBI_PLAT_ABI}
+            FW_PAYLOAD_PATH="${OPENSBI_PLAYLOAD}"
           DEPENDS "${elf_target_file}" elfloader ${USES_TERMINAL_DEBUG})
         # overwrite elf_target_file, it's no longer the ElfLoader but
         # the OpenSBI ELF (which contains the ElfLoader as payload)
