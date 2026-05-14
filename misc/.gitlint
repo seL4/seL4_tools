@@ -46,3 +46,8 @@ regex=^trivial(.*)
 # Ignore certain rules, you can reference them by their id or by their full name
 # Use 'all' to ignore all rules
 ignore=B6
+
+[ignore-body-lines]
+# Ignore lines started with Co-authored-by, Signed-off-by
+# or lines containing a (possibly-space-indented) URL only.
+regex=(^Co-authored-by)|(^Signed-off-by)|(^\s*https?://\S+$)
