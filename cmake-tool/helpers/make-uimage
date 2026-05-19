@@ -58,9 +58,9 @@ written to OUTPUT-FILE.
 EOF
 }
 
-# Clean up temporary file.  $TEMPFILE is defined before this function is called.
+# Clean up temporary directory.  $TEMPDIR is defined before this function is called.
 cleanup () {
-    rm -f $TEMPFILE
+    rm -rf "$TEMPDIR"
 }
 
 # Output the start symbol from given ELF object.
@@ -111,15 +111,15 @@ esac
 # $ARCHITECTURE is now known to be a safe string and no longer requires
 # quotation.
 
-TEMPFILE=$(mktemp)
+# Use a temp directory so that we can directly pass a temp file to objcopy
+# without potential temp file race conditions.
+TEMPDIR=$(mktemp -d)
+TEMPFILE="$TEMPDIR/uimage.bin"
 trap cleanup HUP INT QUIT TERM EXIT
 
-# Note: Because we are using a temporary file, the appending redirection is
-# important!  Do not degenerate it to ">", which will unlink the destination
-# first and reintroduce the race that mktemp avoids.
-"$OBJCOPY" -O binary "$ELF_FILE" /dev/stdout >> $TEMPFILE
+"$OBJCOPY" -O binary "$ELF_FILE" "$TEMPFILE"
 START=$(get_start_symbol "$ELF_FILE")
 mkimage -A $ARCHITECTURE -O linux -T kernel -C none \
-    -a $START -e $START -d $TEMPFILE "$OUTPUT"
+    -a $START -e $START -d "$TEMPFILE" "$OUTPUT"
 
 exit 0
