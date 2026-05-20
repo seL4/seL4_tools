@@ -34,7 +34,11 @@ static void init_downpages(void)
     for (i = GET_PMD_INDEX(start_vaddr); i <= GET_PMD_INDEX(end_vaddr); i++) {
         _boot_pmd_down[i] = (uintptr_t) start_vaddr
                             | BIT(10)  /* access flag */
+#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
+                            | 0b1111 << 2  /* Normal Inner-Write-Back Outer-Write-Back */
+#else
                             | (4 << 2) /* MT_NORMAL memory */
+#endif
                             | BIT(0);  /* 2M block */
         start_vaddr += BIT(ARM_2MB_BLOCK_BITS);
     }
@@ -72,7 +76,11 @@ void init_boot_vspace(struct image_info *kernel_info)
 #if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8) /* make sure the shareability is the same as the kernel's */
 #endif
+#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
+                          | 0b1111 << 2  /* Normal Inner-Write-Back Outer-Write-Back */
+#else
                           | (4 << 2) /* MT_NORMAL memory */
+#endif
                           | BIT(0); /* 2M block */
         first_paddr += BIT(ARM_2MB_BLOCK_BITS);
     }
@@ -100,7 +108,11 @@ void init_hyp_boot_vspace(struct image_info *kernel_info)
 #if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8)
 #endif
+#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
+                          | 0b1111 << 2  /* Normal Inner-Write-Back Outer-Write-Back */
+#else
                           | (4 << 2) /* MT_NORMAL memory */
+#endif
                           | BIT(0); /* 2M block */
     }
 }
