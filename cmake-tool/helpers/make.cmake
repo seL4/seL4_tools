@@ -108,8 +108,11 @@ macro(create_depfile_by_find ret outfile depfile dir)
             ${dir}
             -type
             f
-            -printf
-            "%p "
+            -exec
+            printf
+            "%s "
+            {}
+            +
             >>
             ${depfile}
     )
