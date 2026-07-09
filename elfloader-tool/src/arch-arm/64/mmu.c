@@ -69,9 +69,7 @@ void init_boot_vspace(struct image_info *kernel_info)
     for (i = GET_PMD_INDEX(first_vaddr); i < BIT(PMD_BITS); i++) {
         _boot_pmd_up[i] = first_paddr
                           | BIT(10) /* access flag */
-#if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8) /* make sure the shareability is the same as the kernel's */
-#endif
                           | (4 << 2) /* MT_NORMAL memory */
                           | BIT(0); /* 2M block */
         first_paddr += BIT(ARM_2MB_BLOCK_BITS);
@@ -97,9 +95,7 @@ void init_hyp_boot_vspace(struct image_info *kernel_info)
     for (i = pmd_index; i < BIT(PMD_BITS); i++) {
         _boot_pmd_up[i] = (((i - pmd_index) << ARM_2MB_BLOCK_BITS) + first_paddr)
                           | BIT(10) /* access flag */
-#if CONFIG_MAX_NUM_NODES > 1
                           | (3 << 8)
-#endif
                           | (4 << 2) /* MT_NORMAL memory */
                           | BIT(0); /* 2M block */
     }
