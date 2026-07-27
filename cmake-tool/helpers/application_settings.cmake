@@ -95,7 +95,19 @@ function(ApplyCommonSimulationSettings kernel_sel4_arch)
   endif()
 endfunction()
 
+# Set the optimisation level for user space for cmake RELEASE mode.
+# (The default cmake RELEASE flags otherwise are `-O3 -NDEBUG`).
+function(ApplyUserOptimisationSettings)
+  set(UserOptimisation "-O2" CACHE STRING "Set the user mode optimisation level")
+  set_property(CACHE UserOptimisation PROPERTY STRINGS "-O2;-Os;-O0;-O1;-O3")
+  set(CMAKE_C_FLAGS_RELEASE "${UserOptimisation} -DNDEBUG" CACHE STRING "" FORCE)
+  set(CMAKE_CXX_FLAGS_RELEASE "${UserOptimisation} -DNDEBUG" CACHE STRING "" FORCE)
+  set(CMAKE_ASM_FLAGS_RELEASE "${UserOptimisation} -DNDEBUG" CACHE STRING "" FORCE)
+endfunction()
+
 function(ApplyCommonReleaseVerificationSettings release verification)
+  ApplyUserOptimisationSettings()
+
   # Setup flags for different combinations of 'release' (performance optimized builds) and
   # 'verification' (verification friendly features) builds
   if(release)
