@@ -324,7 +324,8 @@ if(DEFINED KernelDTBPath)
     COMMAND
       ${PYTHON3} ${HARDWARE_GEN_PATH} --elfloader --elfloader-out "${DEVICES_GEN_H}"
       --hardware-config "${config_file}" --hardware-schema "${schema_file}" --dtb "${KernelDTBPath}"
-      --sel4arch "${KernelSel4Arch}"
+      --sel4arch "${KernelSel4Arch}" --kernel-config-flags
+      "CONFIG_MAX_NUM_NODES=${KernelMaxNumNodes}"
     VERBATIM
     DEPENDS ${KernelDTBPath} ${config_file} ${schema_file})
   set_property(SOURCE src/drivers/driver.c PROPERTY OBJECT_DEPENDS ${DEVICES_GEN_H})
