@@ -11,12 +11,11 @@ include_guard(GLOBAL)
 
 function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
   set(binary_list
-      "tx1;hikey;odroidc2;odroidc4;imx8mq-evk;imx8mm-evk;imx8mp-evk;hifive;bcm2837;tqma8xqp1gb;imx93;bcm2711;bcm2712;rocketchip;rk3568;stm32mp2"
+      "tx1;odroidc2;odroidc4;imx8mq-evk;imx8mm-evk;imx8mp-evk;hifive;bcm2837;tqma8xqp1gb;imx93;bcm2711;bcm2712;rocketchip;rk3568;stm32mp2"
   )
   set(efi_list "tk1;rockpro64;quartz64")
   set(uimage_list "hifive-p550;tx2;am335x;bananapi-f3;star64")
-  if(${kernel_platform} IN_LIST efi_list OR (${kernel_platform} STREQUAL "hikey"
-                                             AND ${kernel_sel4_arch} STREQUAL "aarch64"))
+  if(${kernel_platform} IN_LIST efi_list)
     set(ElfloaderImage "efi" CACHE STRING "" FORCE)
   elseif(${kernel_platform} IN_LIST uimage_list)
     set(ElfloaderImage "uimage" CACHE STRING "" FORCE)
@@ -37,10 +36,6 @@ function(ApplyData61ElfLoaderSettings kernel_platform kernel_sel4_arch)
     # It should be possible to use a uimage format but when tried nothing
     # runs after uboot.
     set(IMAGE_START_ADDR 0x42000000 CACHE INTERNAL "" FORCE)
-  endif()
-  if(KernelPlatformHikey AND KernelSel4ArchAarch32)
-    # This is preserving what the Hikey's bootloader requires.
-    set(IMAGE_START_ADDR 0x1000 CACHE INTERNAL "" FORCE)
   endif()
   if(KernelPlatformRock3b)
     set(IMAGE_START_ADDR 0x10000000 CACHE INTERNAL "" FORCE)
@@ -183,7 +178,7 @@ function(correct_platform_strings)
       "imx6:sabre,wandq,nitrogen6sx"
       "bcm2837:rpi3"
       "bcm2711:rpi4"
-      "exynos5:exynos5250,exynos5410,exynos5422"
+      "exynos5:exynos5410,exynos5422"
       "am335x:am335x-boneblack,am335x-boneblue,am335x-bone"
       "zynqmp:zcu102,ultra96,ultra96v2"
       "-KernelSel4Arch"
