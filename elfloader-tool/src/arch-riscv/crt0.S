@@ -121,9 +121,17 @@ hsm_switch_hart:
   mv a0, s0 /* restore a0 to hold hart ID passed by OpenSBI */
   j secondary_harts
 
-
-_start1: /* a0 must hold current hard ID passed by bootloader */
-         /* a1 must hold dtb address passed by bootloader */
+/*----------------------------------------------------------------------------*/
+_start1:
+/* This is basically an asm wrapper to jump to the C code at main(). The
+ * registers are already set up with the perameters for the C code:
+ *   a0: current hard ID passed by bootloader
+ *   a1: dtb address passed by bootloader
+ * All that is left to be done here is setting up the registers gp and sp to
+ * have a proper C environment. The hart we are running on now could be a
+ * different HART to the one that we have been on in _start. The original hart
+ * we came from will get a different stack in secondary_harts.
+ */
 .option push
 .option norelax
 1:auipc gp, %pcrel_hi(__global_pointer$)
@@ -159,14 +167,15 @@ secondary_harts:
 
 #if CONFIG_MAX_NUM_NODES > 1
   la a1, next_logical_core_id
-  li t2, 1
-  amoadd.w t0, t2, (a1)
-  /* now a1 has the logical core id */
-  li t2, CONFIG_MAX_NUM_NODES
-  bge t0, t2, hsm_suspend_hart
+  li t0, 1
+  /* atomically increment next_logical_core_id by one, afterwards a1 holds value
+   * before the update - which is our logical core ID.
+   */
+  amoadd.w a1, t0, (a1)
+  li t0, CONFIG_MAX_NUM_NODES
+  bge a1, t0, hsm_suspend_hart
 
-  mv a1, t0
-  addi t0, t0, 1
+  addi t0, a1, 1
   slli t0, t0, 12
   la sp, core_stack_alloc
   add sp, sp, t0

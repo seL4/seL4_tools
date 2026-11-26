@@ -138,3 +138,5 @@ typedef uintptr_t    word_t;
 #define PRIi_word   PRIiPTR
 #define PRIu_word   PRIuPTR
 #define PRIx_word   PRIxPTR
+
+#define WORD_CONST(x)  _macro_concat3(x, _ptr_type_fmt, u)
